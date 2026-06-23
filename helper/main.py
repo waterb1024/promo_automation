@@ -132,6 +132,7 @@ class GenerateImageRequest(BaseModel):
     height: int = Field(..., ge=64, le=4096, description="채울 사각형의 height (px)")
     kind: str = Field("popup", description="popup | banner — 톤·스타일 힌트")
     extra_hint: Optional[str] = Field(None, description="사용자가 직접 추가하는 스타일/제약 힌트 (선택)")
+    style: str = Field("3d", description="3d | photoreal | illustration")
 
 
 # -------- 유틸 --------
@@ -775,16 +776,30 @@ def _extract_dominant_color_pastel(png_bytes: bytes,
         return None
 
 
-# 고정 이미지 스타일 템플릿 — GPT 가 추출한 개체명만 끼워 넣는다.
-# 변경 시 사용자에게 알리는 게 좋음 (그림 톤이 통째로 바뀜).
-IMAGE_PROMPT_TEMPLATE = (
-    "Simple 3D illustration of {subject}, cute and minimal, no text, no letters, "
-    "smooth matte plastic texture, isolated subject on transparent background, "
-    "no shadow ground plane, high quality, 3D render"
-)
+# 스타일별 이미지 프롬프트 템플릿 — GPT 가 추출한 개체명만 끼워 넣는다.
+# UI 드롭다운의 value 와 키가 일치해야 함 (3d / photoreal / illustration).
+IMAGE_PROMPT_TEMPLATES = {
+    "3d": (
+        "Simple 3D illustration of {subject}, cute and minimal, no text, no letters, "
+        "smooth matte plastic texture, isolated subject on transparent background, "
+        "no shadow ground plane, high quality, 3D render"
+    ),
+    "photoreal": (
+        "Photorealistic studio photograph of {subject}, soft natural lighting, "
+        "isolated subject on transparent background, no text, no letters, no logo, "
+        "no shadow ground plane, sharp focus, high resolution, professional product photography"
+    ),
+    "illustration": (
+        "Flat design illustration of {subject}, simple clean vector style, "
+        "solid color fills only, no outline, no stroke, no line art, "
+        "no text, no letters"
+    ),
+}
+DEFAULT_IMAGE_STYLE = "3d"
 
 
-def _build_image_prompt(texts: List[str], kind: str, extra_hint: Optional[str]) -> str:
+def _build_image_prompt(texts: List[str], kind: str,
+                        extra_hint: Optional[str], style: str = DEFAULT_IMAGE_STYLE) -> str:
     """
     GPT-4o-mini 로 한국어 텍스트에서 핵심 개체명(영어 명사구) 만 뽑아
     고정 스타일 템플릿에 끼워 넣어 반환.
@@ -834,7 +849,8 @@ def _build_image_prompt(texts: List[str], kind: str, extra_hint: Optional[str]) 
     if not subject:
         subject = "a promotional gift item"
 
-    prompt = IMAGE_PROMPT_TEMPLATE.format(subject=subject)
+    template = IMAGE_PROMPT_TEMPLATES.get(style) or IMAGE_PROMPT_TEMPLATES[DEFAULT_IMAGE_STYLE]
+    prompt = template.format(subject=subject)
     if extra_hint:
         prompt += ", " + extra_hint.strip()
     return prompt
@@ -872,7 +888,7 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             _IMAGE_JOBS[job_id]["status"] = "running"
             _IMAGE_JOBS[job_id]["stage"] = "prompt"
 
-        prompt = _build_image_prompt(req.texts, req.kind, req.extra_hint)
+        prompt = _build_image_prompt(req.texts, req.kind, req.extra_hint, req.style)
         log.info("[generate-image:%s] 프롬프트: %s", job_id, prompt[:200])
         with _IMAGE_JOBS_LOCK:
             _IMAGE_JOBS[job_id]["stage"] = "image"
