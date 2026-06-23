@@ -1537,6 +1537,13 @@ figma.ui.onmessage = async function (msg) {
     try {
       if (msg.key) await figma.clientStorage.setAsync(msg.key, msg.value);
     } catch (e) { /* 저장 실패는 silent */ }
+  } else if (msg.type === "ui_resize") {
+    // UI 가 미리보기 박스 펼침/접힘에 맞춰 plugin window 높이 조정 요청
+    try {
+      const w = Math.max(360, Math.min(1200, msg.width || 440));
+      const h = Math.max(400, Math.min(1400, msg.height || 800));
+      figma.ui.resize(w, h);
+    } catch (e) { /* resize 실패 무시 */ }
   } else if (msg.type === "popup_apply_batch_step") {
     // 일괄 처리에서 UI 가 보낸 단일 frame 처리 요청
     try {

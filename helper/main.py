@@ -134,6 +134,7 @@ class GenerateImageRequest(BaseModel):
     extra_hint: Optional[str] = Field(None, description="사용자가 직접 추가하는 스타일/제약 힌트 (선택)")
     style: str = Field("3d", description="3d | photoreal | illustration")
     emphasize_numbers: bool = Field(False, description="텍스트의 금액·퍼센트를 이미지에 강조 표시할지 (기본 off)")
+    feedback: Optional[str] = Field(None, description="재생성 시 사용자가 입력한 피드백 — 무엇을 바꾸고 싶은지")
 
 
 # -------- 유틸 --------
@@ -886,7 +887,8 @@ def _extract_highlight_numbers(texts: List[str]) -> List[str]:
 
 def _build_image_prompt(texts: List[str], kind: str,
                         extra_hint: Optional[str], style: str = DEFAULT_IMAGE_STYLE,
-                        emphasize_numbers: bool = False) -> str:
+                        emphasize_numbers: bool = False,
+                        feedback: Optional[str] = None) -> str:
     """
     GPT-4o-mini 로 한국어 텍스트에서 핵심 개체명(영어 명사구) 만 뽑아
     고정 스타일 템플릿에 끼워 넣어 반환.
@@ -909,6 +911,13 @@ def _build_image_prompt(texts: List[str], kind: str,
         "예시 답변: 'a stack of coupons', 'a piggy bank with cards', 'a gift box with confetti'\n\n"
         "프로모션 문구: " + joined
     )
+    if feedback:
+        # 사용자가 직전 결과를 보고 입력한 피드백 — 다음 추출에 반영
+        extraction_instruction += (
+            "\n\n사용자 피드백 (직전 이미지가 마음에 안 들었던 점 / 바꾸고 싶은 점): "
+            + feedback.strip()
+            + "\n이 피드백을 적극 반영해서 새로운 개체명을 골라줘."
+        )
 
     subject = ""
     try:
@@ -960,6 +969,9 @@ def _build_image_prompt(texts: List[str], kind: str,
 
     if extra_hint:
         prompt += ", " + extra_hint.strip()
+    if feedback:
+        # gpt-image-1 에도 사용자 피드백을 직접 전달 — 추출 단계와 이미지 단계 모두 반영
+        prompt += ", user refinement request: " + feedback.strip()
     return prompt
 
 
@@ -996,7 +1008,8 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             _IMAGE_JOBS[job_id]["stage"] = "prompt"
 
         prompt = _build_image_prompt(
-            req.texts, req.kind, req.extra_hint, req.style, req.emphasize_numbers
+            req.texts, req.kind, req.extra_hint, req.style,
+            req.emphasize_numbers, req.feedback,
         )
         log.info("[generate-image:%s] 프롬프트: %s", job_id, prompt[:200])
         with _IMAGE_JOBS_LOCK:

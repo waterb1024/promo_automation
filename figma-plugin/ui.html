@@ -305,6 +305,10 @@
               <span>프레임 배경: <span id="banner-img-preview-bgcolor">-</span></span>
             </div>
             <div class="img-preview-prompt" id="banner-img-preview-prompt"></div>
+            <label class="lbl" style="margin-top:6px;">재생성 코멘트 (선택) — 뭘 바꾸고 싶은지 적어주세요</label>
+            <textarea class="text-input" id="banner-img-preview-feedback" rows="2"
+              placeholder="예: 더 귀여운 캐릭터로, 분홍색 톤으로, 카드가 아니라 선물상자로"
+              style="resize:vertical;font-family:inherit;margin-bottom:0;"></textarea>
             <div class="img-preview-actions">
               <button class="btn-apply" data-img-preview-apply="banner">적용</button>
               <button class="secondary" data-img-preview-regen="banner">재생성</button>
@@ -353,6 +357,10 @@
               <span>프레임 배경: <span id="popup-img-preview-bgcolor">-</span></span>
             </div>
             <div class="img-preview-prompt" id="popup-img-preview-prompt"></div>
+            <label class="lbl" style="margin-top:6px;">재생성 코멘트 (선택) — 뭘 바꾸고 싶은지 적어주세요</label>
+            <textarea class="text-input" id="popup-img-preview-feedback" rows="2"
+              placeholder="예: 더 귀여운 캐릭터로, 분홍색 톤으로, 카드가 아니라 선물상자로"
+              style="resize:vertical;font-family:inherit;margin-bottom:0;"></textarea>
             <div class="img-preview-actions">
               <button class="btn-apply" data-img-preview-apply="popup">적용</button>
               <button class="secondary" data-img-preview-regen="popup">재생성</button>
@@ -649,11 +657,22 @@
     if (swatch) swatch.style.background = imageData.background_color || "transparent";
     if (bgText) bgText.textContent = imageData.background_color || "(없음)";
     if (promptEl) promptEl.textContent = imageData.prompt || "(프롬프트 없음)";
+    // 새 결과가 나왔으니 직전 피드백 입력 초기화
+    const feedbackEl = document.getElementById(kind + "-img-preview-feedback");
+    if (feedbackEl) feedbackEl.value = "";
     if (box) box.classList.add("active");
+    // plugin window 자체를 키워서 [적용] 버튼이 잘리지 않게
+    parent.postMessage({ pluginMessage: { type: "ui_resize", width: 440, height: 1100 } }, "*");
+    // 그리고 미리보기 박스로 자동 스크롤 (resize 가 느릴 경우 대비)
+    setTimeout(() => {
+      try { box && box.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
+    }, 100);
     _imgGenStop();
     setBusy(false);
   }
   function _hideImgPreview() {
+    // 어느 분기든 plugin window 는 원래 크기로 복원
+    parent.postMessage({ pluginMessage: { type: "ui_resize", width: 440, height: 800 } }, "*");
     if (!_imgPreviewState) {
       // 양쪽 다 닫기 (safety)
       ["popup", "banner"].forEach(k => {
@@ -967,14 +986,17 @@
     const s = _imgPreviewState;
     const hintInput = document.getElementById(s.kind + "-img-hint");
     const styleSelect = document.getElementById(s.kind + "-img-style");
+    const feedbackEl = document.getElementById(s.kind + "-img-preview-feedback");
     const newExtraHint = hintInput && hintInput.value ? hintInput.value.trim() : null;
     const newStyle = styleSelect ? styleSelect.value : (s.context.style || "3d");
+    const feedback = feedbackEl && feedbackEl.value ? feedbackEl.value.trim() : null;
     const ctx = s.context;
     _hideImgPreview();
     setBusy(true);
     _imgGenStart(s.kind);
-    _imgGenSetStage("재생성 중…", "GPT 프롬프트 작성");
-    log("재생성 — hint=" + (newExtraHint || "(없음)") + ", style=" + newStyle, "muted");
+    _imgGenSetStage("재생성 중…", feedback ? "코멘트 반영하여 새 프롬프트 작성" : "GPT 프롬프트 작성");
+    log("재생성 — hint=" + (newExtraHint || "(없음)") + ", style=" + newStyle +
+        (feedback ? ", 코멘트=\"" + feedback + "\"" : ""), "muted");
     try {
       const startResp = await fetch(HELPER_BASE + "/generate-image", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -986,6 +1008,7 @@
           extra_hint: newExtraHint || ctx.extraHint,
           style: newStyle,
           emphasize_numbers: _emphasizeNumbersChecked(s.kind),
+          feedback: feedback,
         }),
       });
       if (!startResp.ok) {
