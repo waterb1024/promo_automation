@@ -810,26 +810,49 @@ _WAN_RE = re.compile(r"(\d+)\s*만\s*원")
 _PCT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
 
 
-# GPT-4o-mini 가 영어 개체명을 추출할 때, 동음이의어 한자 도시명을 "race(경주)"
-# 같이 잘못 번역하지 않도록 영문 힌트를 덧붙여 입력에 주입한다.
-# 누락된 도시가 있으면 이 set 에 추가만 하면 됨.
+# 한국 지역명 + 영문 음역. 동음이의 일반명사가 있는 케이스는 "NOT ..." 부연으로
+# GPT-4o-mini 가 도시명을 일반 명사(예: 양산=parasol, 경주=race)로 오역하지 않게 차단.
 KOREAN_PLACE_NAMES = {
     # 1차 등록
-    "밀양", "진천", "충주", "상주", "세종", "천안", "강릉",
-    "경주", "김포", "청주", "영암", "경기", "양산", "인천",
+    "밀양": "Miryang city in South Korea",
+    "진천": "Jincheon county in South Korea",
+    "충주": "Chungju city in South Korea",
+    "상주": "Sangju city in South Korea (NOT the Korean word meaning 'permanent residence')",
+    "세종": "Sejong city in South Korea",
+    "천안": "Cheonan city in South Korea",
+    "강릉": "Gangneung city in South Korea",
+    "경주": "Gyeongju city in South Korea (NOT the Korean word for 'race/competition')",
+    "김포": "Gimpo city in South Korea",
+    "청주": "Cheongju city in South Korea",
+    "영암": "Yeongam county in South Korea",
+    "경기": "Gyeonggi province in South Korea (NOT the Korean word for 'game/match')",
+    "양산": "Yangsan city in South Korea (NOT the Korean word for 'parasol/umbrella')",
+    "인천": "Incheon city in South Korea",
     # 2차 등록
-    "영광", "경산", "고성", "영월", "김천", "동해", "의성",
-    "옥천", "삼척", "음성", "인제", "횡성", "태백", "울진",
+    "영광": "Yeonggwang county in South Korea (NOT the Korean word for 'glory')",
+    "경산": "Gyeongsan city in South Korea",
+    "고성": "Goseong county in South Korea (NOT the Korean word for 'loud voice')",
+    "영월": "Yeongwol county in South Korea",
+    "김천": "Gimcheon city in South Korea",
+    "동해": "Donghae coastal city in South Korea (NOT the literal 'East Sea')",
+    "의성": "Uiseong county in South Korea",
+    "옥천": "Okcheon county in South Korea",
+    "삼척": "Samcheok city in South Korea",
+    "음성": "Eumseong county in South Korea (NOT the Korean word for 'voice/sound')",
+    "인제": "Inje county in South Korea",
+    "횡성": "Hoengseong county in South Korea",
+    "태백": "Taebaek city in South Korea",
+    "울진": "Uljin county in South Korea",
 }
 
 
 def _annotate_korean_places(text: str) -> str:
-    """텍스트 안에 한국 지역명이 있으면 'a city/region in Korea' 힌트를 1회 덧붙인다."""
+    """텍스트에 한국 지역명이 있으면 음역+부연 힌트를 1회 덧붙인다."""
     if not text:
         return text
-    for name in KOREAN_PLACE_NAMES:
+    for name, annotation in KOREAN_PLACE_NAMES.items():
         if name in text:
-            text = text.replace(name, f"{name}(a city/region in Korea)", 1)
+            text = text.replace(name, f"{name} ({annotation})", 1)
     return text
 
 
