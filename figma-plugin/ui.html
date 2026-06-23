@@ -266,18 +266,6 @@
     </div>
     <div style="padding-top:10px;">
 
-      <!-- 공용 옵션 (배너/팝업 모두 적용) -->
-      <div style="display:flex;flex-direction:column;gap:4px;padding:0 2px 8px;font-size:10.5px;color:#444;">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="skip-preview" style="width:auto;margin:0;" />
-          <label for="skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용 (빠른/일괄 모드)</label>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="emphasize-numbers" style="width:auto;margin:0;" />
-          <label for="emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자를 이미지에 강조 표시 (예: 20000, 5%)</label>
-        </div>
-      </div>
-
       <!-- 배너 -->
       <div class="sub-tab-content active" id="sub-banner">
         <div class="card">
@@ -292,9 +280,17 @@
             <option value="illustration">2D 일러스트</option>
           </select>
           <label class="lbl">AI 이미지 스타일 힌트 (선택)</label>
-          <input class="text-input" id="banner-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:8px;" />
+          <input class="text-input" id="banner-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:6px;" />
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10.5px;color:#444;">
+            <input type="checkbox" id="banner-emphasize-numbers" style="width:auto;margin:0;" />
+            <label for="banner-emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자 강조 (예: 20000, 5%)</label>
+          </div>
           <button id="banner-apply-image" class="btn-apply">적용 + 이미지 생성</button>
-          <button id="banner-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:0;">템플릿만 적용</button>
+          <button id="banner-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#444;">
+            <input type="checkbox" id="banner-skip-preview" style="width:auto;margin:0;" />
+            <label for="banner-skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용</label>
+          </div>
           <div class="img-gen-status" id="banner-img-gen-status">
             <span class="timer" id="banner-img-gen-timer">0s</span>
             <span class="stage" id="banner-img-gen-stage">준비 중…</span>
@@ -332,9 +328,17 @@
             <option value="illustration">2D 일러스트</option>
           </select>
           <label class="lbl">AI 이미지 스타일 힌트 (선택)</label>
-          <input class="text-input" id="popup-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:8px;" />
+          <input class="text-input" id="popup-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:6px;" />
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10.5px;color:#444;">
+            <input type="checkbox" id="popup-emphasize-numbers" style="width:auto;margin:0;" />
+            <label for="popup-emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자 강조 (예: 20000, 5%)</label>
+          </div>
           <button id="popup-apply-image" class="btn-apply">적용 + 이미지 생성</button>
-          <button id="popup-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:0;">템플릿만 적용</button>
+          <button id="popup-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#444;">
+            <input type="checkbox" id="popup-skip-preview" style="width:auto;margin:0;" />
+            <label for="popup-skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용</label>
+          </div>
           <div class="img-gen-status" id="popup-img-gen-status">
             <span class="timer" id="popup-img-gen-timer">0s</span>
             <span class="stage" id="popup-img-gen-stage">준비 중…</span>
@@ -553,8 +557,21 @@
   const bannerApplyImageBtn = document.getElementById("banner-apply-image");
   const popupImgHintInput   = document.getElementById("popup-img-hint");
   const bannerImgHintInput  = document.getElementById("banner-img-hint");
-  const skipPreviewCheckbox = document.getElementById("skip-preview");
-  const emphasizeNumbersCheckbox = document.getElementById("emphasize-numbers");
+  // popup/banner 별 체크박스를 그때그때 조회하기 위한 헬퍼
+  function _skipPreviewBox(kind) {
+    return document.getElementById((kind || "popup") + "-skip-preview");
+  }
+  function _emphasizeNumbersBox(kind) {
+    return document.getElementById((kind || "popup") + "-emphasize-numbers");
+  }
+  function _skipPreviewChecked(kind) {
+    const el = _skipPreviewBox(kind);
+    return !!(el && el.checked);
+  }
+  function _emphasizeNumbersChecked(kind) {
+    const el = _emphasizeNumbersBox(kind);
+    return !!(el && el.checked);
+  }
 
   // image_generate_prepare 의 응답을 어떤 kind 로 처리할지 추적 (popup/banner)
   let _imageGenPending = null;  // { kind, extraHint }
@@ -620,7 +637,7 @@
     const bgText  = document.getElementById(kind + "-img-preview-bgcolor");
     const promptEl = document.getElementById(kind + "-img-preview-prompt");
     // 미리보기 스킵 토글 또는 일괄 처리 중이면 자동 적용
-    const skip = (skipPreviewCheckbox && skipPreviewCheckbox.checked) || !!_batchState;
+    const skip = _skipPreviewChecked(kind) || !!_batchState;
     if (skip) {
       log("  · 미리보기 스킵 — 바로 적용", "muted");
       _imgGenStop();
@@ -968,7 +985,7 @@
           kind: ctx.kind,
           extra_hint: newExtraHint || ctx.extraHint,
           style: newStyle,
-          emphasize_numbers: !!(emphasizeNumbersCheckbox && emphasizeNumbersCheckbox.checked),
+          emphasize_numbers: _emphasizeNumbersChecked(s.kind),
         }),
       });
       if (!startResp.ok) {
@@ -1088,8 +1105,10 @@
       setIf("banner-img-style", s.setting_banner_style);
       setIf("banner-img-hint", s.setting_banner_hint);
       // skip-preview / emphasize-numbers 는 의도적으로 복원 안 함 — 매번 default 미선택으로 시작
-      if (skipPreviewCheckbox) skipPreviewCheckbox.checked = false;
-      if (emphasizeNumbersCheckbox) emphasizeNumbersCheckbox.checked = false;
+      ["popup", "banner"].forEach(k => {
+        const a = _skipPreviewBox(k); if (a) a.checked = false;
+        const b = _emphasizeNumbersBox(k); if (b) b.checked = false;
+      });
     } else if (msg.type === "selection_changed") {
       _selectionInfo = msg.info || { total: 0, frameCount: 0, frames: [] };
       _updateApplyImageButtonLabels();
@@ -1160,7 +1179,7 @@
             kind: pending.kind,
             extra_hint: pending.extraHint,
             style: msg.style,
-            emphasize_numbers: !!(emphasizeNumbersCheckbox && emphasizeNumbersCheckbox.checked),
+            emphasize_numbers: _emphasizeNumbersChecked(pending.kind),
           }),
         });
         if (!startResp.ok) {
