@@ -133,6 +133,7 @@ class GenerateImageRequest(BaseModel):
     kind: str = Field("popup", description="popup | banner — 톤·스타일 힌트")
     extra_hint: Optional[str] = Field(None, description="사용자가 직접 추가하는 스타일/제약 힌트 (선택)")
     style: str = Field("3d", description="3d | photoreal | illustration")
+    emphasize_numbers: bool = Field(False, description="텍스트의 금액·퍼센트를 이미지에 강조 표시할지 (기본 off)")
 
 
 # -------- 유틸 --------
@@ -799,13 +800,37 @@ DEFAULT_IMAGE_STYLE = "3d"
 
 
 # 텍스트에서 명시적 금액·퍼센트 추출 — 이미지에 prominent 하게 노출할 후보.
-# 한국어 단위는 가독성을 위해 변환:
-#   "5만원"     → "50,000원"
-#   "20000원"   → "20,000원"
-#   "5%"        → "5%"  (그대로)
+# 이미지에 들어갈 형태로 정규화:
+#   "5만원"     → "50000"   (만원 펼침 + 원/콤마 제거)
+#   "20,000원"  → "20000"   (콤마/원 제거)
+#   "30000원"   → "30000"
+#   "5%"        → "5%"      (% 유지)
 _PRICE_RE = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+)\s*원")
 _WAN_RE = re.compile(r"(\d+)\s*만\s*원")
 _PCT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+
+
+# GPT-4o-mini 가 영어 개체명을 추출할 때, 동음이의어 한자 도시명을 "race(경주)"
+# 같이 잘못 번역하지 않도록 영문 힌트를 덧붙여 입력에 주입한다.
+# 누락된 도시가 있으면 이 set 에 추가만 하면 됨.
+KOREAN_PLACE_NAMES = {
+    # 1차 등록
+    "밀양", "진천", "충주", "상주", "세종", "천안", "강릉",
+    "경주", "김포", "청주", "영암", "경기", "양산", "인천",
+    # 2차 등록
+    "영광", "경산", "고성", "영월", "김천", "동해", "의성",
+    "옥천", "삼척", "음성", "인제", "횡성", "태백", "울진",
+}
+
+
+def _annotate_korean_places(text: str) -> str:
+    """텍스트 안에 한국 지역명이 있으면 'a city/region in Korea' 힌트를 1회 덧붙인다."""
+    if not text:
+        return text
+    for name in KOREAN_PLACE_NAMES:
+        if name in text:
+            text = text.replace(name, f"{name}(a city/region in Korea)", 1)
+    return text
 
 
 def _extract_highlight_numbers(texts: List[str]) -> List[str]:
@@ -818,31 +843,27 @@ def _extract_highlight_numbers(texts: List[str]) -> List[str]:
     for t in texts:
         if not t:
             continue
-        # "5만원" 먼저 처리 (콤마 포맷 펼침)
+        # "5만원" 먼저 처리 → 숫자만 ("50000")
         for m in _WAN_RE.finditer(t):
             try:
                 n = int(m.group(1))
-                _add(f"{n * 10000:,}원")
+                _add(str(n * 10000))
             except ValueError:
                 pass
-        # 일반 금액 — "5만원" 매치 이후 남은 패턴
+        # 일반 금액 — "5만원" 매치 이후 남은 패턴. 콤마/원 제거하고 숫자만
         stripped = _WAN_RE.sub("", t)
         for m in _PRICE_RE.finditer(stripped):
-            raw = m.group(1)
-            # 1234 → 1,234 로 정규화 (콤마 없는 케이스)
-            if "," not in raw:
-                try:
-                    raw = f"{int(raw):,}"
-                except ValueError:
-                    pass
-            _add(f"{raw}원")
+            raw = m.group(1).replace(",", "")
+            _add(raw)
+        # 퍼센트는 그대로
         for m in _PCT_RE.finditer(t):
             _add(f"{m.group(1)}%")
     return out
 
 
 def _build_image_prompt(texts: List[str], kind: str,
-                        extra_hint: Optional[str], style: str = DEFAULT_IMAGE_STYLE) -> str:
+                        extra_hint: Optional[str], style: str = DEFAULT_IMAGE_STYLE,
+                        emphasize_numbers: bool = False) -> str:
     """
     GPT-4o-mini 로 한국어 텍스트에서 핵심 개체명(영어 명사구) 만 뽑아
     고정 스타일 템플릿에 끼워 넣어 반환.
@@ -850,7 +871,7 @@ def _build_image_prompt(texts: List[str], kind: str,
     """
     from openai import OpenAI
 
-    joined = " / ".join(t.strip() for t in texts if t and t.strip())
+    joined = " / ".join(_annotate_korean_places(t.strip()) for t in texts if t and t.strip())
     if not joined:
         joined = "프로모션 행사"
 
@@ -895,20 +916,21 @@ def _build_image_prompt(texts: List[str], kind: str,
     template = IMAGE_PROMPT_TEMPLATES.get(style) or IMAGE_PROMPT_TEMPLATES[DEFAULT_IMAGE_STYLE]
     prompt = template.format(subject=subject)
 
-    # 명시적 금액/% 가 있으면 그 숫자만 이미지에 노출 ("no text" 제약 일부 해제)
-    highlights = _extract_highlight_numbers(texts)
-    if highlights:
-        # 이미지에 표시할 때는 가독성을 위해 천 단위 콤마 제거 ("20,000원" → "20000원")
-        primary_display = highlights[0].replace(",", "")
-        # "no text, no letters" / "no text" / "no letters" 제거
-        prompt = re.sub(r",\s*no text,\s*no letters", "", prompt)
-        prompt = re.sub(r",\s*no text", "", prompt)
-        prompt = re.sub(r",\s*no letters", "", prompt)
-        prompt += (
-            ", the only text in the image is the bold large number "
-            f'"{primary_display}" prominently displayed as the central focal point, '
-            "no other text or letters anywhere"
-        )
+    # 옵트인 "숫자 강조": emphasize_numbers=True 일 때만 금액/% 를 이미지에 노출.
+    # 추출된 값은 이미 "원" 단위 제거 + 콤마 제거된 형태 (예: "20000", "5%")
+    if emphasize_numbers:
+        highlights = _extract_highlight_numbers(texts)
+        if highlights:
+            primary_display = highlights[0]
+            # "no text, no letters" / "no text" / "no letters" 제거
+            prompt = re.sub(r",\s*no text,\s*no letters", "", prompt)
+            prompt = re.sub(r",\s*no text", "", prompt)
+            prompt = re.sub(r",\s*no letters", "", prompt)
+            prompt += (
+                ", the only text in the image is the bold large number "
+                f'"{primary_display}" prominently displayed as the central focal point, '
+                "no other text or letters anywhere"
+            )
 
     if extra_hint:
         prompt += ", " + extra_hint.strip()
@@ -947,7 +969,9 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             _IMAGE_JOBS[job_id]["status"] = "running"
             _IMAGE_JOBS[job_id]["stage"] = "prompt"
 
-        prompt = _build_image_prompt(req.texts, req.kind, req.extra_hint, req.style)
+        prompt = _build_image_prompt(
+            req.texts, req.kind, req.extra_hint, req.style, req.emphasize_numbers
+        )
         log.info("[generate-image:%s] 프롬프트: %s", job_id, prompt[:200])
         with _IMAGE_JOBS_LOCK:
             _IMAGE_JOBS[job_id]["stage"] = "image"
