@@ -927,8 +927,11 @@ def _build_image_prompt(texts: List[str], kind: str,
             prompt = re.sub(r",\s*no text", "", prompt)
             prompt = re.sub(r",\s*no letters", "", prompt)
             prompt += (
-                ", the only text in the image is the bold large number "
-                f'"{primary_display}" prominently displayed as the central focal point, '
+                f', the giant oversized number "{primary_display}" '
+                "rendered in extremely bold thick typography is the dominant element "
+                "occupying most of the canvas, drawn substantially larger than any other "
+                "illustration element, as the central focal point; all other elements are "
+                "significantly smaller and act as supporting decoration; "
                 "no other text or letters anywhere"
             )
 
