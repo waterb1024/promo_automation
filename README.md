@@ -522,17 +522,3 @@ curl -s http://127.0.0.1:7000/health | python3 -m json.tool
    tail -30 ~/.promo-automation/helper.err.log
    tail -30 ~/.promo-automation/helper.log
    ```
-
----
-
-## 팀 공유용 zip 만들기 (배포자용)
-
-```bash
-cd ~/Documents
-zip -r promo-automation.zip promo-automation/ \
-  -x "promo-automation/helper/__pycache__/*" \
-  -x "promo-automation/helper/scripts/__pycache__/*" \
-  -x "*.DS_Store"
-```
-
-본인 config.json 은 `~/.promo-export/` 별도 위치에 있어서 위 zip 에 자동 제외됩니다.
