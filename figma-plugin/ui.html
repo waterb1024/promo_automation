@@ -749,7 +749,7 @@
   _wireSettingPersist("popup-img-hint", "setting_popup_hint");
   _wireSettingPersist("banner-img-style", "setting_banner_style");
   _wireSettingPersist("banner-img-hint", "setting_banner_hint");
-  _wireSettingPersist("skip-preview", "setting_skip_preview");
+  // skip-preview 는 영속화하지 않음 — 매 plugin 실행 시 default 미선택으로 시작
 
   // ── 초기 로드 ──
   parent.postMessage({ pluginMessage: { type: "popup_get_templates" } }, "*");
@@ -1079,7 +1079,8 @@
       setIf("popup-img-hint", s.setting_popup_hint);
       setIf("banner-img-style", s.setting_banner_style);
       setIf("banner-img-hint", s.setting_banner_hint);
-      setIf("skip-preview", s.setting_skip_preview);
+      // skip-preview 는 의도적으로 복원 안 함 — 매번 default 미선택으로 시작
+      if (skipPreviewCheckbox) skipPreviewCheckbox.checked = false;
     } else if (msg.type === "selection_changed") {
       _selectionInfo = msg.info || { total: 0, frameCount: 0, frames: [] };
       _updateApplyImageButtonLabels();
