@@ -798,6 +798,49 @@ IMAGE_PROMPT_TEMPLATES = {
 DEFAULT_IMAGE_STYLE = "3d"
 
 
+# 텍스트에서 명시적 금액·퍼센트 추출 — 이미지에 prominent 하게 노출할 후보.
+# 한국어 단위는 가독성을 위해 변환:
+#   "5만원"     → "50,000원"
+#   "20000원"   → "20,000원"
+#   "5%"        → "5%"  (그대로)
+_PRICE_RE = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+)\s*원")
+_WAN_RE = re.compile(r"(\d+)\s*만\s*원")
+_PCT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+
+
+def _extract_highlight_numbers(texts: List[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    def _add(v: str) -> None:
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+    for t in texts:
+        if not t:
+            continue
+        # "5만원" 먼저 처리 (콤마 포맷 펼침)
+        for m in _WAN_RE.finditer(t):
+            try:
+                n = int(m.group(1))
+                _add(f"{n * 10000:,}원")
+            except ValueError:
+                pass
+        # 일반 금액 — "5만원" 매치 이후 남은 패턴
+        stripped = _WAN_RE.sub("", t)
+        for m in _PRICE_RE.finditer(stripped):
+            raw = m.group(1)
+            # 1234 → 1,234 로 정규화 (콤마 없는 케이스)
+            if "," not in raw:
+                try:
+                    raw = f"{int(raw):,}"
+                except ValueError:
+                    pass
+            _add(f"{raw}원")
+        for m in _PCT_RE.finditer(t):
+            _add(f"{m.group(1)}%")
+    return out
+
+
 def _build_image_prompt(texts: List[str], kind: str,
                         extra_hint: Optional[str], style: str = DEFAULT_IMAGE_STYLE) -> str:
     """
@@ -851,6 +894,22 @@ def _build_image_prompt(texts: List[str], kind: str,
 
     template = IMAGE_PROMPT_TEMPLATES.get(style) or IMAGE_PROMPT_TEMPLATES[DEFAULT_IMAGE_STYLE]
     prompt = template.format(subject=subject)
+
+    # 명시적 금액/% 가 있으면 그 숫자만 이미지에 노출 ("no text" 제약 일부 해제)
+    highlights = _extract_highlight_numbers(texts)
+    if highlights:
+        # 이미지에 표시할 때는 가독성을 위해 천 단위 콤마 제거 ("20,000원" → "20000원")
+        primary_display = highlights[0].replace(",", "")
+        # "no text, no letters" / "no text" / "no letters" 제거
+        prompt = re.sub(r",\s*no text,\s*no letters", "", prompt)
+        prompt = re.sub(r",\s*no text", "", prompt)
+        prompt = re.sub(r",\s*no letters", "", prompt)
+        prompt += (
+            ", the only text in the image is the bold large number "
+            f'"{primary_display}" prominently displayed as the central focal point, '
+            "no other text or letters anywhere"
+        )
+
     if extra_hint:
         prompt += ", " + extra_hint.strip()
     return prompt
