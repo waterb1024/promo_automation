@@ -266,6 +266,12 @@
     </div>
     <div style="padding-top:10px;">
 
+      <!-- 공용 옵션 (배너/팝업 모두 적용) -->
+      <div style="display:flex;align-items:center;gap:6px;padding:0 2px 8px;font-size:10.5px;color:#444;">
+        <input type="checkbox" id="skip-preview" style="width:auto;margin:0;" />
+        <label for="skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용 (빠른/일괄 모드)</label>
+      </div>
+
       <!-- 배너 -->
       <div class="sub-tab-content active" id="sub-banner">
         <div class="card">
@@ -541,11 +547,17 @@
   const bannerApplyImageBtn = document.getElementById("banner-apply-image");
   const popupImgHintInput   = document.getElementById("popup-img-hint");
   const bannerImgHintInput  = document.getElementById("banner-img-hint");
+  const skipPreviewCheckbox = document.getElementById("skip-preview");
 
   // image_generate_prepare 의 응답을 어떤 kind 로 처리할지 추적 (popup/banner)
   let _imageGenPending = null;  // { kind, extraHint }
   // popup_apply 후 자동으로 이미지 생성까지 이어갈지 여부
   let _chainImageGenAfterApply = null;  // { kind, extraHint } | null
+  // 일괄 처리 상태 (selection 여러 frame 시)
+  // { kind, style, hint, templateKey, items: [{id,name}], idx, errors: [] }
+  let _batchState = null;
+  // code.js 가 알려주는 최신 selection 정보 (frame multi-select 감지용)
+  let _selectionInfo = { total: 0, frameCount: 0, frames: [] };
 
   // 이미지 생성 진행 상태 박스 컨트롤
   let _imgGenTimerHandle = null;
@@ -600,6 +612,15 @@
     const swatch  = document.getElementById(kind + "-img-preview-swatch");
     const bgText  = document.getElementById(kind + "-img-preview-bgcolor");
     const promptEl = document.getElementById(kind + "-img-preview-prompt");
+    // 미리보기 스킵 토글 또는 일괄 처리 중이면 자동 적용
+    const skip = (skipPreviewCheckbox && skipPreviewCheckbox.checked) || !!_batchState;
+    if (skip) {
+      log("  · 미리보기 스킵 — 바로 적용", "muted");
+      _imgGenStop();
+      // _previewApply 가 _imgPreviewState 를 읽고 image_generate_apply 전송
+      _previewApply();
+      return;
+    }
     if (thumb) thumb.src = "data:image/png;base64," + imageData.image_base64;
     if (swatch) swatch.style.background = imageData.background_color || "transparent";
     if (bgText) bgText.textContent = imageData.background_color || "(없음)";
@@ -711,9 +732,29 @@
     refreshDsApplyTemplates();
   }
 
+  // ── 사용자 설정 영속화 (style/hint/skip-preview) ──
+  function _saveSetting(key, value) {
+    parent.postMessage({ pluginMessage: { type: "ui_setting_save", key: key, value: value } }, "*");
+  }
+  function _wireSettingPersist(elId, key) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const evt = el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "blur";
+    el.addEventListener(evt, () => {
+      const v = el.type === "checkbox" ? el.checked : el.value;
+      _saveSetting(key, v);
+    });
+  }
+  _wireSettingPersist("popup-img-style", "setting_popup_style");
+  _wireSettingPersist("popup-img-hint", "setting_popup_hint");
+  _wireSettingPersist("banner-img-style", "setting_banner_style");
+  _wireSettingPersist("banner-img-hint", "setting_banner_hint");
+  _wireSettingPersist("skip-preview", "setting_skip_preview");
+
   // ── 초기 로드 ──
   parent.postMessage({ pluginMessage: { type: "popup_get_templates" } }, "*");
   parent.postMessage({ pluginMessage: { type: "get_detail_sections" } }, "*");
+  parent.postMessage({ pluginMessage: { type: "ui_settings_load" } }, "*");
 
   // ── 이벤트 ──
   loadPptBtn.addEventListener("click", async () => {
@@ -804,6 +845,12 @@
     const extraHint = hintInput && hintInput.value ? hintInput.value.trim() : null;
     const styleSel = document.getElementById(kind + "-img-style");
     const style = (styleSel && styleSel.value) || "3d";
+
+    // selection 이 frame 여러 개면 일괄 처리 모드로 분기
+    if (_selectionInfo && _selectionInfo.frameCount >= 2) {
+      _startBatch(kind, key, style, extraHint, typeSelect.selectedOptions[0].textContent);
+      return;
+    }
     _chainImageGenAfterApply = { kind: kind, extraHint: extraHint || null, style: style };
     setBusy(true);
     _imgGenStart(kind);
@@ -813,6 +860,63 @@
   }
   bannerApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("banner", bannerTypeSelect, bannerImgHintInput));
   popupApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("popup", popupTypeSelect, popupImgHintInput));
+
+  // ── 일괄 처리 (selection 여러 frame) ──
+  function _startBatch(kind, templateKey, style, extraHint, templateLabel) {
+    _batchState = {
+      kind: kind,
+      templateKey: templateKey,
+      style: style,
+      extraHint: extraHint || null,
+      items: (_selectionInfo.frames || []).slice(),
+      idx: 0,
+      errors: [],
+      templateLabel: templateLabel,
+    };
+    setBusy(true);
+    _imgGenStart(kind);
+    log("일괄 처리 시작 — " + _batchState.items.length + "개 영역, [" + templateLabel + "]" +
+        " · 미리보기 자동 스킵", "info");
+    _runNextBatchStep();
+  }
+
+  function _runNextBatchStep() {
+    if (!_batchState) return;
+    const b = _batchState;
+    if (b.idx >= b.items.length) {
+      // 끝
+      const okCount = b.items.length - b.errors.length;
+      log("✓ 일괄 처리 종료 — 성공 " + okCount + "/" + b.items.length +
+          (b.errors.length > 0 ? ", 실패 " + b.errors.length : ""), "ok");
+      _batchState = null;
+      _chainImageGenAfterApply = null;
+      _imageGenPending = null;
+      _imgGenStop();
+      setBusy(false);
+      _updateApplyImageButtonLabels();
+      return;
+    }
+    const cur = b.items[b.idx];
+    b.idx++;
+    _imgGenSetStage("일괄 " + b.idx + "/" + b.items.length, cur.name);
+    log("  [" + b.idx + "/" + b.items.length + "] " + cur.name, "muted");
+    // 다음 step 의 chain 설정 — popup_apply_done 이 트리거되면 image_generate 까지 자동 진행
+    _chainImageGenAfterApply = { kind: b.kind, extraHint: b.extraHint, style: b.style };
+    parent.postMessage({
+      pluginMessage: { type: "popup_apply_batch_step", nodeId: cur.id, templateKey: b.templateKey },
+    }, "*");
+  }
+
+  // 버튼 라벨 갱신 — selection 변경 시 호출
+  function _updateApplyImageButtonLabels() {
+    const fc = (_selectionInfo && _selectionInfo.frameCount) || 0;
+    const set = (btn, defaultText) => {
+      if (!btn) return;
+      btn.textContent = fc >= 2 ? (fc + "개 영역 일괄 처리") : defaultText;
+    };
+    set(bannerApplyImageBtn, "적용 + 이미지 생성");
+    set(popupApplyImageBtn, "적용 + 이미지 생성");
+  }
 
   // ── 미리보기 [적용] / [재생성] / [취소] ──
   async function _previewApply() {
@@ -962,6 +1066,28 @@
       setBusy(false);
     } else if (msg.type === "load_ppt_error") {
       log("✗ Figma 배치 실패: " + msg.message, "error"); setBusy(false);
+    } else if (msg.type === "ui_settings_loaded") {
+      // popup/banner 별 style + hint, 그리고 skip-preview 복원
+      const s = msg.settings || {};
+      const setIf = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el || val === undefined || val === null) return;
+        if (el.type === "checkbox") el.checked = !!val;
+        else el.value = String(val);
+      };
+      setIf("popup-img-style", s.setting_popup_style);
+      setIf("popup-img-hint", s.setting_popup_hint);
+      setIf("banner-img-style", s.setting_banner_style);
+      setIf("banner-img-hint", s.setting_banner_hint);
+      setIf("skip-preview", s.setting_skip_preview);
+    } else if (msg.type === "selection_changed") {
+      _selectionInfo = msg.info || { total: 0, frameCount: 0, frames: [] };
+      _updateApplyImageButtonLabels();
+    } else if (msg.type === "popup_apply_batch_error") {
+      // 일괄 처리 중 한 step 실패 — 진행 계속
+      log("  ⚠ 일괄 처리 step 실패: " + (msg.message || ""), "warn");
+      if (_batchState) _batchState.errors.push(msg.message || "(원인 미상)");
+      _runNextBatchStep();
     } else if (msg.type === "popup_templates") {
       refreshPopupDropdowns(msg.templates);
     } else if (msg.type === "popup_register_done") {
@@ -1070,15 +1196,25 @@
         else
           log("  ✓ 프레임 배경색 적용: " + msg.frameBgApplied, "info");
       }
-      _imgGenStop();
-      setBusy(false);
       _imageGenPending = null;
+      if (_batchState) {
+        // 일괄 모드 — busy/timer 유지하고 다음 step 으로
+        _runNextBatchStep();
+      } else {
+        _imgGenStop();
+        setBusy(false);
+      }
     } else if (msg.type === "image_generate_error") {
       log("✗ " + msg.message, "error");
-      _imgGenStop();
-      setBusy(false);
       _imageGenPending = null;
-      _chainImageGenAfterApply = null;
+      if (_batchState) {
+        _batchState.errors.push(msg.message || "(원인 미상)");
+        _runNextBatchStep();
+      } else {
+        _imgGenStop();
+        setBusy(false);
+        _chainImageGenAfterApply = null;
+      }
     } else if (msg.type === "detail_sections_loaded") {
       refreshDsSectionDropdowns(msg.templates);
     } else if (msg.type === "detail_section_registered") {

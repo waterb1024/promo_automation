@@ -1515,10 +1515,104 @@ figma.ui.onmessage = async function (msg) {
     } catch (e) {
       postError("설정 가져오기 오류: " + (e && e.message ? e.message : String(e)));
     }
+  } else if (msg.type === "ui_settings_load") {
+    // UI 가 시작할 때 한 번 호출 — 모든 사용자 설정값을 한 번에 로드
+    try {
+      const keys = [
+        "setting_popup_style", "setting_popup_hint",
+        "setting_banner_style", "setting_banner_hint",
+        "setting_skip_preview",
+      ];
+      const out = {};
+      for (const k of keys) {
+        out[k] = await figma.clientStorage.getAsync(k);
+      }
+      figma.ui.postMessage({ type: "ui_settings_loaded", settings: out });
+    } catch (e) {
+      // 실패해도 fatal 아님 — UI 는 default 값으로 진행
+      figma.ui.postMessage({ type: "ui_settings_loaded", settings: {} });
+    }
+  } else if (msg.type === "ui_setting_save") {
+    // 단일 설정값 저장 (key, value)
+    try {
+      if (msg.key) await figma.clientStorage.setAsync(msg.key, msg.value);
+    } catch (e) { /* 저장 실패는 silent */ }
+  } else if (msg.type === "popup_apply_batch_step") {
+    // 일괄 처리에서 UI 가 보낸 단일 frame 처리 요청
+    try {
+      await applyPopupBatchStep(msg);
+    } catch (e) {
+      figma.ui.postMessage({
+        type: "popup_apply_batch_error",
+        message: (e && e.message ? e.message : String(e)),
+        nodeId: msg.nodeId,
+      });
+    }
   } else if (msg.type === "close") {
     figma.closePlugin();
   }
 };
+
+// ── selection 변경 → UI 에 알림 (일괄 처리 모드 토글용) ─────────────────
+function _summarizeSelection() {
+  const sel = figma.currentPage.selection || [];
+  const frames = [];
+  for (const n of sel) {
+    if (n.type === "FRAME" || n.type === "INSTANCE" || n.type === "COMPONENT") {
+      frames.push({ id: n.id, name: n.name || "(이름 없음)" });
+    }
+  }
+  return {
+    total: sel.length,
+    frameCount: frames.length,
+    frames: frames,
+  };
+}
+figma.on("selectionchange", function () {
+  try {
+    figma.ui.postMessage({ type: "selection_changed", info: _summarizeSelection() });
+  } catch (e) { /* UI 가 닫혔을 수 있음 */ }
+});
+
+// ── 일괄 처리: UI 가 보낸 nodeId 1개를 선택 → popup_apply 흐름 시작 ──
+async function applyPopupBatchStep(msg) {
+  const nodeId = msg && msg.nodeId;
+  const key = msg && msg.templateKey;
+  if (!nodeId || !key) {
+    figma.ui.postMessage({
+      type: "popup_apply_batch_error",
+      message: "nodeId 또는 templateKey 누락",
+      nodeId: nodeId,
+    });
+    return;
+  }
+  let node = null;
+  try {
+    if (typeof figma.getNodeByIdAsync === "function") {
+      node = await figma.getNodeByIdAsync(nodeId);
+    } else {
+      node = figma.getNodeById(nodeId);
+    }
+  } catch (e) {
+    figma.ui.postMessage({
+      type: "popup_apply_batch_error",
+      message: "node 조회 실패: " + (e && e.message ? e.message : String(e)),
+      nodeId: nodeId,
+    });
+    return;
+  }
+  if (!node) {
+    figma.ui.postMessage({
+      type: "popup_apply_batch_error",
+      message: "node 를 찾을 수 없습니다 (삭제됨)",
+      nodeId: nodeId,
+    });
+    return;
+  }
+  // selection 을 해당 node 만으로 강제 → 기존 applyPopupTemplate 그대로 사용
+  figma.currentPage.selection = [node];
+  await applyPopupTemplate({ key: key });
+}
 
 // ── 상세페이지 섹션 템플릿 관리 ──────────────────────────────────────────────
 const DS_STORAGE_KEY = "detail_section_templates_v1";
