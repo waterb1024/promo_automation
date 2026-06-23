@@ -1,0 +1,19 @@
+{
+  "first_upload": "{mention} 매니저님, {counts_text} 전달드립니다.\n\n[^{zip_filename}]",
+  "revision":     "{mention} 매니저님, 수정사항 반영하여 {counts_text} 전달드립니다.\n\n[^{zip_filename}]",
+
+  "_notes": [
+    "{mention}      → Jira reporter 멘션 (Server/DC: [~username] 형식)",
+    "{counts_text}  → 추출된 타입을 자연어로 조합. count가 0인 타입은 자동 제외.",
+    "                  예) banner=1, popup=1, landing=1 → '배너1개, 팝업1개, 랜딩페이지1개'",
+    "                  예) banner=0, popup=2, landing=1 → '팝업2개, 랜딩페이지1개'",
+    "                  예) banner=2, popup=0, landing=0 → '배너2개'",
+    "                  예) 모두 0  → '시안'",
+    "{zip_filename} → 이번에 첨부한 zip 파일명. [^...] 로 감싸면 다운로드 링크로 렌더링.",
+    "{banner}       → banner 타입 프레임 수 (legacy — counts_text 권장)",
+    "{popup}        → popup 타입 프레임 수 (legacy)",
+    "{landing}      → landing 타입 메인 프레임 수 (legacy)",
+    "{date}         → MMDD",
+    "{promotion}    → 프로모션명"
+  ]
+}

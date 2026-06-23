@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 0;
+    color: #222; background: #fff;
+    display: flex; flex-direction: column;
+    height: 100vh; overflow: hidden;
+  }
+
+  .top-area {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid #e8ecf2;
+    flex-shrink: 0;
+  }
+  .top-title { font-size: 12px; font-weight: 700; color: #1a1a2e; margin: 0 0 8px; }
+  .jira-row { display: flex; gap: 6px; align-items: center; }
+  .jira-label { font-size: 10px; color: #666; white-space: nowrap; flex-shrink: 0; }
+  input.jira-input {
+    flex: 1; padding: 6px 9px; font-size: 12px;
+    border: 1px solid #d0d0d0; border-radius: 5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; min-width: 0;
+  }
+  input.jira-input:focus { outline: none; border-color: #18A0FB; }
+
+  /* 메인 탭 */
+  .tab-bar {
+    display: flex; background: #f4f5f7;
+    border-bottom: 1px solid #e0e4ec; flex-shrink: 0;
+  }
+  .tab-btn {
+    flex: 1; padding: 8px 4px;
+    font-size: 11px; font-weight: 500; color: #666;
+    background: transparent; border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer; margin: 0; width: auto; border-radius: 0;
+  }
+  .tab-btn:hover { color: #333; }
+  .tab-btn.active { color: #18A0FB; border-bottom-color: #18A0FB; background: #fff; font-weight: 600; }
+
+  /* 서브 탭 */
+  .sub-tab-bar { display: flex; gap: 4px; padding: 10px 14px 0; flex-shrink: 0; }
+  .sub-tab-btn {
+    padding: 5px 12px; font-size: 11px; font-weight: 500;
+    color: #666; background: #f0f2f5;
+    border: 1px solid #dde2ec; border-radius: 20px;
+    cursor: pointer; margin: 0; width: auto; transition: all 0.12s;
+  }
+  .sub-tab-btn:hover { background: #e4e8f0; color: #333; }
+  .sub-tab-btn.active { background: #5e72e4; color: #fff; border-color: #5e72e4; font-weight: 600; }
+
+  /* 탭 콘텐츠 */
+  .tab-content { flex: 1; overflow-y: auto; padding: 12px 14px; display: none; }
+  .tab-content.active { display: block; }
+  .sub-tab-content { display: none; }
+  .sub-tab-content.active { display: block; }
+
+  /* 공통 */
+  label.lbl { display: block; font-size: 10.5px; color: #555; margin-bottom: 3px; }
+  input.text-input, select.text-input {
+    width: 100%; padding: 7px 9px; font-size: 12px;
+    border: 1px solid #d0d0d0; border-radius: 5px;
+    margin-bottom: 8px; font-family: inherit; background: #fff;
+  }
+  input.text-input:focus, select.text-input:focus { outline: none; border-color: #18A0FB; }
+
+  button {
+    width: 100%; padding: 9px; font-size: 12px;
+    border: none; border-radius: 6px; cursor: pointer;
+    margin-bottom: 6px; font-weight: 500; transition: background 0.12s;
+  }
+  button.primary { background: #18A0FB; color: #fff; }
+  button.primary:hover:enabled { background: #0d8de0; }
+  button.secondary { background: #f0f0f0; color: #333; }
+  button.secondary:hover:enabled { background: #e4e4e4; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 6px; }
+  .btn-row button { flex: 1; margin-bottom: 0; }
+
+  .card {
+    background: #f8faff; border: 1px solid #dbe5f2;
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
+  }
+  .card-title { font-size: 11px; font-weight: 600; color: #2c5aa0; margin: 0 0 8px; }
+
+  details.help { margin-bottom: 8px; }
+  details.help summary {
+    cursor: pointer; font-size: 10.5px; color: #5e72e4;
+    font-weight: 500; list-style: none; user-select: none;
+  }
+  details.help summary::-webkit-details-marker { display: none; }
+  details.help summary::after { content: " ›"; font-size: 13px; display: inline-block; transition: transform 0.12s; }
+  details.help[open] summary::after { transform: rotate(90deg); }
+  details.help .hint { font-size: 10.5px; color: #6a7689; line-height: 1.5; margin: 5px 0 0; }
+
+  button.btn-reg {
+    background: #fff; color: #5e72e4; border: 1px solid #c5d2e5;
+    font-size: 11px; padding: 6px 8px; font-weight: 400;
+  }
+  button.btn-reg:hover:enabled { background: #f0f4fb; }
+  button.btn-del {
+    background: #fff; color: #c53030; border: 1px solid #f5d0d0;
+    font-size: 11px; padding: 6px 8px; font-weight: 400;
+  }
+  button.btn-del:hover:enabled { background: #fff5f5; }
+  button.btn-apply { background: #5e72e4; color: #fff; }
+  button.btn-apply:hover:enabled { background: #4255cc; }
+
+  /* 이미지 생성 진행 상태 박스 */
+  .img-gen-status {
+    margin-top: 6px; padding: 8px 10px;
+    background: #eef3ff; border: 1px solid #c9d6f3;
+    border-radius: 6px; font-size: 10.5px; color: #2c3e80;
+    display: none; line-height: 1.5;
+  }
+  .img-gen-status.active { display: block; }
+  .img-gen-status .stage { font-weight: 600; }
+  .img-gen-status .timer {
+    float: right; font-family: "SF Mono", Menlo, Consolas, monospace;
+    color: #5e72e4; font-weight: 600;
+  }
+  .img-gen-status .substep {
+    font-size: 10px; color: #6a7689; margin-top: 2px;
+  }
+  .img-gen-status .bar {
+    margin-top: 6px; height: 4px; background: #d9e3f7;
+    border-radius: 2px; overflow: hidden; position: relative;
+  }
+  .img-gen-status .bar::after {
+    content: ""; position: absolute; left: -40%; top: 0;
+    width: 40%; height: 100%; background: #5e72e4;
+    animation: imgGenSlide 1.4s linear infinite;
+  }
+  @keyframes imgGenSlide {
+    0% { left: -40%; } 100% { left: 100%; }
+  }
+
+  /* 설정 탭 섹션 구분 */
+  .settings-section-title {
+    font-size: 11px; font-weight: 600; color: #444;
+    margin: 14px 0 8px; padding-bottom: 5px;
+    border-bottom: 1px solid #e8ecf2;
+  }
+  .settings-section-title:first-child { margin-top: 0; }
+
+  /* 로그 */
+  .log-area { flex-shrink: 0; border-top: 1px solid #e8ecf2; }
+  .log-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 12px; cursor: pointer; user-select: none;
+  }
+  .log-toggle span { font-size: 10px; color: #888; font-weight: 500; }
+  .log {
+    font-size: 10.5px; padding: 6px 12px 8px; background: #f7f7f7;
+    max-height: 130px; overflow-y: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-all; display: none;
+  }
+  .log.open { display: block; }
+  .log-entry { margin-bottom: 2px; line-height: 1.4; }
+  .log-error { color: #d32f2f; } .log-warn { color: #e07700; }
+  .log-ok { color: #2e7d32; font-weight: 600; } .log-info { color: #444; }
+  .log-muted { color: #999; } .log-bold { font-weight: 600; }
+
+  .footer {
+    padding: 4px 14px 6px; display: flex; justify-content: flex-end;
+    border-top: 1px solid #f0f0f0; flex-shrink: 0;
+  }
+  button.close-link {
+    background: transparent; color: #aaa; border: none;
+    padding: 2px 0; font-size: 10.5px; font-weight: 400;
+    text-decoration: underline; width: auto; margin: 0;
+  }
+  button.close-link:hover:enabled { color: #666; }
+</style>
+</head>
+<body>
+
+  <!-- 상단 고정 -->
+  <div class="top-area">
+    <div class="top-title">프로모션 자동화</div>
+    <div class="jira-row">
+      <span class="jira-label">Way 이슈 키</span>
+      <input id="jira" class="jira-input" type="text" placeholder="예: KONASALES-1234" autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- 메인 탭 바 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="tab-way">Way 연동</button>
+    <button class="tab-btn" data-tab="tab-apply">적용</button>
+    <button class="tab-btn" data-tab="tab-settings">설정</button>
+  </div>
+
+  <!-- ── Tab 1: Way 연동 ── -->
+  <div class="tab-content active" id="tab-way">
+    <div class="card">
+      <div class="card-title">PPT 슬라이드 가져오기</div>
+      <details class="help">
+        <summary>사용 방법</summary>
+        <p class="hint">Way 이슈 키 입력 후 [가져오기] 클릭.<br/>이슈에 첨부된 PPT를 LibreOffice로 변환 후 Figma에 배치.</p>
+      </details>
+      <button id="load-ppt" class="secondary">이슈 PPT 슬라이드 가져오기</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">시안 추출 → Way 업로드</div>
+      <details class="help">
+        <summary>사용 방법</summary>
+        <p class="hint">
+          1. 시안 페이지에서 <b>올릴 frame 선택</b><br/>
+          2. 위 <b>Way 이슈 키</b> 입력<br/>
+          3. <b>[Way 업로드]</b> — frame → PNG → zip → Way 첨부 + 댓글 자동<br/><br/>
+          <b>검수용</b>: [zip만 만들기]는 Way 호출 없이 zip만 생성.
+        </p>
+      </details>
+      <button id="upload" class="primary">Way 업로드</button>
+      <button id="zip-only" class="secondary" style="font-size:11px;padding:7px;">zip만 만들기 (검수용)</button>
+    </div>
+  </div>
+
+  <!-- ── Tab 2: 적용 ── -->
+  <div class="tab-content" id="tab-apply">
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn active" data-sub="sub-banner">배너</button>
+      <button class="sub-tab-btn" data-sub="sub-popup">팝업</button>
+      <button class="sub-tab-btn" data-sub="sub-detail">상세페이지</button>
+    </div>
+    <div style="padding-top:10px;">
+
+      <!-- 배너 -->
+      <div class="sub-tab-content active" id="sub-banner">
+        <div class="card">
+          <label class="lbl">배너 종류</label>
+          <select id="banner-type" class="text-input" style="margin-bottom:8px;">
+            <option value="">(등록된 배너 없음 — 설정 탭에서 등록)</option>
+          </select>
+          <label class="lbl">AI 이미지 스타일 힌트 (선택)</label>
+          <input class="text-input" id="banner-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:8px;" />
+          <button id="banner-apply-image" class="btn-apply">적용 + 이미지 생성</button>
+          <button id="banner-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:0;">템플릿만 적용</button>
+          <div class="img-gen-status" id="banner-img-gen-status">
+            <span class="timer" id="banner-img-gen-timer">0s</span>
+            <span class="stage" id="banner-img-gen-stage">준비 중…</span>
+            <div class="substep" id="banner-img-gen-substep"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 팝업 -->
+      <div class="sub-tab-content" id="sub-popup">
+        <div class="card">
+          <label class="lbl">팝업 종류</label>
+          <select id="popup-type" class="text-input" style="margin-bottom:8px;">
+            <option value="">(등록된 팝업 없음 — 설정 탭에서 등록)</option>
+          </select>
+          <label class="lbl">AI 이미지 스타일 힌트 (선택)</label>
+          <input class="text-input" id="popup-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:8px;" />
+          <button id="popup-apply-image" class="btn-apply">적용 + 이미지 생성</button>
+          <button id="popup-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:0;">템플릿만 적용</button>
+          <div class="img-gen-status" id="popup-img-gen-status">
+            <span class="timer" id="popup-img-gen-timer">0s</span>
+            <span class="stage" id="popup-img-gen-stage">준비 중…</span>
+            <div class="substep" id="popup-img-gen-substep"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 상세페이지 -->
+      <div class="sub-tab-content" id="sub-detail">
+        <div class="card">
+          <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
+            캔버스에서 기준 프레임 선택 (없어도 됨) → 종류·템플릿 선택 → [적용]<br/>
+            선택한 프레임 바로 아래에 배치됩니다.
+          </p>
+          <label class="lbl">섹션 종류</label>
+          <select id="ds-apply-type" class="text-input" style="margin-bottom:6px;">
+            <option value="main-image">메인 이미지</option>
+            <option value="coupon">쿠폰</option>
+            <option value="text">텍스트</option>
+            <option value="button">버튼</option>
+            <option value="marketing">마케팅수신동의</option>
+            <option value="notice">유의사항</option>
+          </select>
+          <label class="lbl">템플릿</label>
+          <select id="ds-apply-template" class="text-input" style="margin-bottom:6px;">
+            <option value="">(등록된 템플릿 없음)</option>
+          </select>
+          <button id="ds-apply-btn" class="btn-apply">적용</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Tab 3: 설정 ── -->
+  <div class="tab-content" id="tab-settings">
+
+    <div class="settings-section-title">배너 템플릿</div>
+    <div class="card">
+      <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
+        라이브러리 인스턴스(배너) 선택 → [+ 등록]<br/>
+        삭제: dropdown 선택 후 [삭제]
+      </p>
+      <div class="btn-row">
+        <button id="banner-register" class="btn-reg">+ 배너 등록</button>
+        <button id="banner-delete" class="btn-del">삭제</button>
+      </div>
+    </div>
+
+    <div class="settings-section-title">팝업 템플릿</div>
+    <div class="card">
+      <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
+        라이브러리 인스턴스(팝업) 선택 → [+ 등록]<br/>
+        삭제: 적용 탭 dropdown 선택 후 [삭제]
+      </p>
+      <div class="btn-row">
+        <button id="popup-register" class="btn-reg">+ 팝업 등록</button>
+        <button id="popup-delete" class="btn-del">삭제</button>
+      </div>
+    </div>
+
+    <div class="settings-section-title">상세페이지 섹션 템플릿</div>
+    <div class="card">
+      <details class="help">
+        <summary>사용 방법</summary>
+        <p class="hint">라이브러리 컴포넌트 배치 → 선택 → 섹션 종류·이름 입력 → [+ 등록].<br/>쿠폰처럼 여러 디자인이면 반복 등록.</p>
+      </details>
+      <label class="lbl">섹션 종류</label>
+      <select id="ds-reg-type" class="text-input" style="margin-bottom:6px;">
+        <option value="main-image">메인 이미지</option>
+        <option value="coupon">쿠폰</option>
+        <option value="text">텍스트</option>
+        <option value="button">버튼</option>
+        <option value="marketing">마케팅수신동의</option>
+        <option value="notice">유의사항</option>
+      </select>
+      <label class="lbl">템플릿 이름</label>
+      <input class="text-input" id="ds-reg-name" placeholder="예: 기본 쿠폰, 이벤트 쿠폰" style="margin-bottom:6px;" />
+      <div class="btn-row" style="margin-bottom:6px;">
+        <button id="ds-reg-add" class="btn-reg">+ 등록</button>
+        <button id="ds-reg-del" class="btn-del">삭제</button>
+      </div>
+      <select id="ds-reg-del-select" class="text-input" style="display:none;margin-bottom:0;">
+        <option value="">(삭제할 항목 선택)</option>
+      </select>
+    </div>
+
+    <div class="settings-section-title">설정 백업</div>
+    <div class="card">
+      <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
+        팀원과 템플릿 설정을 공유하거나 새 기기에서 복원할 때 사용합니다.
+      </p>
+      <div class="btn-row">
+        <button id="cfg-export" class="btn-reg" style="font-size:11px;">↑ 내보내기</button>
+        <button id="cfg-import-btn" class="btn-reg" style="font-size:11px;">↓ 가져오기</button>
+        <input type="file" id="cfg-import-input" accept=".json" style="display:none;" />
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 로그 -->
+  <div class="log-area">
+    <div class="log-toggle" id="log-toggle">
+      <span id="log-toggle-label">▾ 로그</span>
+      <span id="log-count" style="font-size:10px;color:#aaa;"></span>
+    </div>
+    <div class="log open" id="log"></div>
+  </div>
+
+  <!-- 푸터 -->
+  <div class="footer">
+    <button id="close" class="close-link">plugin 닫기</button>
+  </div>
+
+<script>
+  const HELPER_BASE = "http://127.0.0.1:7000";
+
+  // ── 메인 탭 ──
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.tab).classList.add("active");
+      closeLog();
+    });
+  });
+
+  // ── 서브 탭 ──
+  document.querySelectorAll(".sub-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".sub-tab-content").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.sub).classList.add("active");
+      closeLog();
+    });
+  });
+
+  // ── 로그 ──
+  const logEl = document.getElementById("log");
+  const logToggleLabel = document.getElementById("log-toggle-label");
+  const logCount = document.getElementById("log-count");
+  let logOpen = true, logEntryCount = 0;
+
+  function closeLog() {
+    if (!logOpen) return;
+    logOpen = false;
+    logEl.classList.remove("open");
+    logToggleLabel.textContent = "▸ 로그";
+  }
+
+  document.getElementById("log-toggle").addEventListener("click", () => {
+    logOpen = !logOpen;
+    logEl.classList.toggle("open", logOpen);
+    logToggleLabel.textContent = (logOpen ? "▾" : "▸") + " 로그";
+    if (logOpen) { logEl.scrollTop = logEl.scrollHeight; logCount.textContent = ""; }
+  });
+
+  // ── 이슈 키 ──
+  const jiraInput = document.getElementById("jira");
+  try { const s = sessionStorage.getItem("promo_jira_key"); if (s) jiraInput.value = s; } catch (e) {}
+  jiraInput.addEventListener("input", () => {
+    try { sessionStorage.setItem("promo_jira_key", jiraInput.value.trim()); } catch (e) {}
+  });
+
+  function log(msg, cls) {
+    const div = document.createElement("div");
+    div.className = "log-entry log-" + (cls || "info");
+    div.textContent = msg;
+    logEl.appendChild(div);
+    logEntryCount++;
+    if (logOpen) logEl.scrollTop = logEl.scrollHeight;
+    else logCount.textContent = logEntryCount + "줄";
+  }
+
+  // ── 버튼 레퍼런스 ──
+  const loadPptBtn       = document.getElementById("load-ppt");
+  const uploadBtn        = document.getElementById("upload");
+  const zipOnlyBtn       = document.getElementById("zip-only");
+  const closeBtn         = document.getElementById("close");
+  const bannerApplyBtn   = document.getElementById("banner-apply");
+  const bannerRegBtn     = document.getElementById("banner-register");
+  const bannerDelBtn     = document.getElementById("banner-delete");
+  const bannerTypeSelect = document.getElementById("banner-type");
+  const popupApplyBtn    = document.getElementById("popup-apply");
+  const popupRegisterBtn = document.getElementById("popup-register");
+  const popupDeleteBtn   = document.getElementById("popup-delete");
+  const popupTypeSelect  = document.getElementById("popup-type");
+  const dsApplyTypeSelect     = document.getElementById("ds-apply-type");
+  const dsApplyTemplateSelect = document.getElementById("ds-apply-template");
+  const dsApplyBtn            = document.getElementById("ds-apply-btn");
+  const dsRegAddBtn     = document.getElementById("ds-reg-add");
+  const dsRegDelBtn     = document.getElementById("ds-reg-del");
+  const dsRegTypeSelect = document.getElementById("ds-reg-type");
+  const dsRegNameInput  = document.getElementById("ds-reg-name");
+  const dsRegDelSelect  = document.getElementById("ds-reg-del-select");
+  const popupApplyImageBtn  = document.getElementById("popup-apply-image");
+  const bannerApplyImageBtn = document.getElementById("banner-apply-image");
+  const popupImgHintInput   = document.getElementById("popup-img-hint");
+  const bannerImgHintInput  = document.getElementById("banner-img-hint");
+
+  // image_generate_prepare 의 응답을 어떤 kind 로 처리할지 추적 (popup/banner)
+  let _imageGenPending = null;  // { kind, extraHint }
+  // popup_apply 후 자동으로 이미지 생성까지 이어갈지 여부
+  let _chainImageGenAfterApply = null;  // { kind, extraHint } | null
+
+  // 이미지 생성 진행 상태 박스 컨트롤
+  let _imgGenTimerHandle = null;
+  let _imgGenStartTs = null;
+  let _imgGenActiveKind = null;
+  function _imgGenStart(kind) {
+    _imgGenActiveKind = kind;
+    _imgGenStartTs = Date.now();
+    const box = document.getElementById(kind + "-img-gen-status");
+    if (box) box.classList.add("active");
+    _imgGenSetStage("준비 중…", "");
+    if (_imgGenTimerHandle) clearInterval(_imgGenTimerHandle);
+    _imgGenTimerHandle = setInterval(() => {
+      if (!_imgGenStartTs || !_imgGenActiveKind) return;
+      const s = Math.floor((Date.now() - _imgGenStartTs) / 1000);
+      const t = document.getElementById(_imgGenActiveKind + "-img-gen-timer");
+      if (t) t.textContent = s + "s";
+    }, 500);
+  }
+  function _imgGenSetStage(stageText, substepText) {
+    if (!_imgGenActiveKind) return;
+    const stageEl = document.getElementById(_imgGenActiveKind + "-img-gen-stage");
+    const subEl = document.getElementById(_imgGenActiveKind + "-img-gen-substep");
+    if (stageEl) stageEl.textContent = stageText;
+    if (subEl) subEl.textContent = substepText || "";
+  }
+  function _imgGenStop() {
+    if (_imgGenTimerHandle) clearInterval(_imgGenTimerHandle);
+    _imgGenTimerHandle = null;
+    _imgGenStartTs = null;
+    if (_imgGenActiveKind) {
+      const box = document.getElementById(_imgGenActiveKind + "-img-gen-status");
+      if (box) box.classList.remove("active");
+    }
+    _imgGenActiveKind = null;
+  }
+
+  const DS_TYPE_LABEL = {
+    "main-image": "메인 이미지", "coupon": "쿠폰", "text": "텍스트",
+    "button": "버튼", "marketing": "마케팅수신동의", "notice": "유의사항",
+  };
+  let _dsTemplates = [];
+
+  function setBusy(busy) {
+    [loadPptBtn, uploadBtn, zipOnlyBtn,
+     bannerApplyBtn, bannerRegBtn, bannerDelBtn,
+     popupApplyBtn, popupRegisterBtn, popupDeleteBtn,
+     popupApplyImageBtn, bannerApplyImageBtn,
+     dsApplyBtn, dsRegAddBtn].forEach(el => { if (el) el.disabled = busy; });
+  }
+
+  // ── 팝업/배너 dropdown ──
+  function _typeOf(rawName) { return (String(rawName || "").split("_")[1] || "").toLowerCase(); }
+  function shortName(rawName) {
+    const s = String(rawName || "").trim();
+    const tokens = s.split("_");
+    const last = tokens[tokens.length - 1];
+    const secondLast = tokens[tokens.length - 2];
+    if ((/^\d+x\d+$/.test(last) || /^\d+$/.test(last)) && secondLast) return secondLast + " (" + last + ")";
+    return s;
+  }
+  function formatPopupName(rawName) {
+    const TYPE_LABEL = { popup: "[팝업]", banner: "[배너]", landing: "[랜딩]" };
+    const typeKey = _typeOf(rawName);
+    return (TYPE_LABEL[typeKey] ? TYPE_LABEL[typeKey] + " " : "") + shortName(rawName);
+  }
+
+  function fillTypeSelect(sel, templates, typeKey, emptyLabel) {
+    sel.innerHTML = "";
+    const filtered = (templates || []).filter(t => _typeOf(t.name) === typeKey);
+    if (filtered.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = ""; opt.textContent = emptyLabel;
+      sel.appendChild(opt);
+    } else {
+      filtered.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.key; opt.textContent = shortName(t.name); opt.title = t.name;
+        sel.appendChild(opt);
+      });
+    }
+  }
+
+  function refreshPopupDropdowns(templates, selectedKey) {
+    fillTypeSelect(bannerTypeSelect, templates, "banner", "(등록된 배너 없음 — 설정 탭에서 등록)");
+    fillTypeSelect(popupTypeSelect,  templates, "popup",  "(등록된 팝업 없음 — 설정 탭에서 등록)");
+    if (selectedKey) {
+      [bannerTypeSelect, popupTypeSelect].forEach(sel => {
+        if (sel.querySelector('[value="' + selectedKey + '"]')) sel.value = selectedKey;
+      });
+    }
+  }
+
+  // ── 상세페이지 dropdown ──
+  function refreshDsApplyTemplates() {
+    const type = dsApplyTypeSelect.value;
+    const filtered = _dsTemplates.filter(t => t.sectionType === type);
+    dsApplyTemplateSelect.innerHTML = "";
+    if (filtered.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = ""; opt.textContent = "(등록된 템플릿 없음)";
+      dsApplyTemplateSelect.appendChild(opt);
+      dsApplyBtn.disabled = true;
+    } else {
+      filtered.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.key; opt.textContent = t.name;
+        dsApplyTemplateSelect.appendChild(opt);
+      });
+      dsApplyBtn.disabled = false;
+    }
+  }
+
+  function refreshDsSectionDropdowns(templates) {
+    _dsTemplates = templates || [];
+    dsRegDelSelect.innerHTML = '<option value="">(삭제할 항목 선택)</option>';
+    _dsTemplates.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.key;
+      opt.textContent = "[" + (DS_TYPE_LABEL[t.sectionType] || t.sectionType) + "] " + t.name;
+      dsRegDelSelect.appendChild(opt);
+    });
+    dsRegDelSelect.style.display = _dsTemplates.length > 0 ? "block" : "none";
+    refreshDsApplyTemplates();
+  }
+
+  // ── 초기 로드 ──
+  parent.postMessage({ pluginMessage: { type: "popup_get_templates" } }, "*");
+  parent.postMessage({ pluginMessage: { type: "get_detail_sections" } }, "*");
+
+  // ── 이벤트 ──
+  loadPptBtn.addEventListener("click", async () => {
+    const key = jiraInput.value.trim();
+    if (!key) { log("✗ Way 이슈 키를 먼저 입력해주세요.", "error"); jiraInput.focus(); return; }
+    setBusy(true); logEl.innerHTML = ""; logEntryCount = 0;
+    log("이슈 " + key + " 에서 PPT 가져오는 중...", "muted");
+    try {
+      const resp = await fetch(HELPER_BASE + "/issue/load_ppt", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jira_key: key }),
+      });
+      if (!resp.ok) { log("Helper 오류 " + resp.status + ": " + await resp.text(), "error"); setBusy(false); return; }
+      const data = await resp.json();
+      log("✓ PPT 받음: " + data.ppt_filename, "ok");
+      log("  슬라이드: " + data.slides.length + "장 · Assignee: " + (data.assignee.display || data.assignee.username || "(없음)"), "info");
+      log("Figma에 배치 중...", "muted");
+      parent.postMessage({ pluginMessage: { type: "load_ppt_apply", data } }, "*");
+    } catch (e) { log("Helper 연결 실패: " + e.message, "error"); setBusy(false); }
+  });
+
+  uploadBtn.addEventListener("click", () => {
+    const key = jiraInput.value.trim();
+    if (!key) { log("✗ Way 이슈 키를 먼저 입력해주세요.", "error"); jiraInput.focus(); return; }
+    if (!/^[A-Z]+-\d+$/i.test(key)) log("⚠ 이슈 키 형식이 일반 패턴(ABC-1234)과 달라요. 진행합니다.", "warn");
+    setBusy(true); logEl.innerHTML = ""; logEntryCount = 0;
+    log("추출 → Way 업로드 시작 (이슈 " + key + ")", "muted");
+    parent.postMessage({ pluginMessage: { type: "extract", mode: "upload", jiraKey: key } }, "*");
+  });
+
+  zipOnlyBtn.addEventListener("click", () => {
+    setBusy(true); logEl.innerHTML = ""; logEntryCount = 0;
+    log("추출 → zip 생성 (Way 호출 없음, 검수용)", "muted");
+    parent.postMessage({ pluginMessage: { type: "extract", mode: "zip" } }, "*");
+  });
+
+  bannerApplyBtn.addEventListener("click", () => {
+    const key = bannerTypeSelect.value;
+    if (!key) { log("✗ 배너 종류를 선택해주세요. 설정 탭에서 먼저 등록하세요.", "error"); return; }
+    setBusy(true);
+    log("선택 영역에 [" + bannerTypeSelect.selectedOptions[0].textContent + "] 적용 중...", "muted");
+    parent.postMessage({ pluginMessage: { type: "popup_apply", key } }, "*");
+  });
+
+  bannerRegBtn.addEventListener("click", () => {
+    setBusy(true);
+    log("선택된 인스턴스를 배너로 등록 중...", "muted");
+    parent.postMessage({ pluginMessage: { type: "popup_register" } }, "*");
+  });
+
+  bannerDelBtn.addEventListener("click", () => {
+    const key = bannerTypeSelect.value;
+    if (!key) { log("✗ 삭제할 배너를 적용 탭 dropdown에서 먼저 선택해주세요.", "error"); return; }
+    if (!confirm("배너 '" + bannerTypeSelect.selectedOptions[0].textContent + "' 등록을 삭제할까요?")) return;
+    setBusy(true);
+    parent.postMessage({ pluginMessage: { type: "popup_delete_template", key } }, "*");
+  });
+
+  popupApplyBtn.addEventListener("click", () => {
+    const key = popupTypeSelect.value;
+    if (!key) { log("✗ 팝업 종류를 선택해주세요. 설정 탭에서 먼저 등록하세요.", "error"); return; }
+    setBusy(true);
+    log("선택 영역에 [" + popupTypeSelect.selectedOptions[0].textContent + "] 적용 중...", "muted");
+    parent.postMessage({ pluginMessage: { type: "popup_apply", key } }, "*");
+  });
+
+  popupRegisterBtn.addEventListener("click", () => {
+    setBusy(true);
+    log("선택된 인스턴스를 팝업으로 등록 중...", "muted");
+    parent.postMessage({ pluginMessage: { type: "popup_register" } }, "*");
+  });
+
+  popupDeleteBtn.addEventListener("click", () => {
+    const key = popupTypeSelect.value;
+    if (!key) { log("✗ 삭제할 팝업을 적용 탭 dropdown에서 먼저 선택해주세요.", "error"); return; }
+    if (!confirm("팝업 '" + popupTypeSelect.selectedOptions[0].textContent + "' 등록을 삭제할까요?")) return;
+    setBusy(true);
+    parent.postMessage({ pluginMessage: { type: "popup_delete_template", key } }, "*");
+  });
+
+  function triggerApplyAndImage(kind, typeSelect, hintInput) {
+    const key = typeSelect.value;
+    const label = kind === "banner" ? "배너" : "팝업";
+    if (!key) {
+      log("✗ " + label + " 종류를 선택해주세요. 설정 탭에서 먼저 등록하세요.", "error");
+      return;
+    }
+    const extraHint = hintInput && hintInput.value ? hintInput.value.trim() : null;
+    _chainImageGenAfterApply = { kind: kind, extraHint: extraHint || null };
+    setBusy(true);
+    _imgGenStart(kind);
+    _imgGenSetStage("템플릿 적용 중…", "선택 영역에 컴포넌트 인스턴스 생성");
+    log("[" + typeSelect.selectedOptions[0].textContent + "] 적용 후 이미지 생성 진행...", "muted");
+    parent.postMessage({ pluginMessage: { type: "popup_apply", key } }, "*");
+  }
+  bannerApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("banner", bannerTypeSelect, bannerImgHintInput));
+  popupApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("popup", popupTypeSelect, popupImgHintInput));
+
+  dsApplyTypeSelect.addEventListener("change", refreshDsApplyTemplates);
+
+  dsApplyBtn.addEventListener("click", () => {
+    const templateKey = dsApplyTemplateSelect.value;
+    if (!templateKey) { log("✗ 적용할 템플릿을 선택해주세요.", "error"); return; }
+    const typeName = DS_TYPE_LABEL[dsApplyTypeSelect.value] || dsApplyTypeSelect.value;
+    setBusy(true);
+    log("[" + typeName + "] " + dsApplyTemplateSelect.selectedOptions[0].textContent + " 배치 중...", "muted");
+    parent.postMessage({ pluginMessage: { type: "apply_detail_section", templateKey } }, "*");
+  });
+
+  dsRegAddBtn.addEventListener("click", () => {
+    const sectionType = dsRegTypeSelect.value;
+    const name = dsRegNameInput.value.trim();
+    if (!name) { log("✗ 템플릿 이름을 입력해주세요.", "error"); dsRegNameInput.focus(); return; }
+    setBusy(true);
+    log("[" + (DS_TYPE_LABEL[sectionType] || sectionType) + "] 템플릿 등록 중: " + name, "muted");
+    parent.postMessage({ pluginMessage: { type: "register_detail_section", sectionType, name } }, "*");
+  });
+
+  dsRegDelBtn.addEventListener("click", () => {
+    const key = dsRegDelSelect.value;
+    if (!key) { log("✗ 삭제할 템플릿을 선택해주세요.", "error"); dsRegDelSelect.style.display = "block"; return; }
+    const label = dsRegDelSelect.selectedOptions[0].textContent;
+    if (!confirm("'" + label + "' 템플릿 등록을 삭제할까요?")) return;
+    setBusy(true);
+    parent.postMessage({ pluginMessage: { type: "delete_detail_section", key } }, "*");
+  });
+
+  // 설정 내보내기/가져오기
+  document.getElementById("cfg-export").addEventListener("click", () => {
+    parent.postMessage({ pluginMessage: { type: "export_config" } }, "*");
+  });
+  const cfgImportInput = document.getElementById("cfg-import-input");
+  document.getElementById("cfg-import-btn").addEventListener("click", () => {
+    cfgImportInput.value = ""; cfgImportInput.click();
+  });
+  cfgImportInput.addEventListener("change", () => {
+    const file = cfgImportInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const config = JSON.parse(e.target.result);
+        setBusy(true);
+        log("설정 가져오는 중...", "muted");
+        parent.postMessage({ pluginMessage: { type: "import_config", config } }, "*");
+      } catch (err) { log("✗ JSON 파싱 실패: " + err.message, "error"); }
+    };
+    reader.readAsText(file);
+  });
+
+  closeBtn.addEventListener("click", () => {
+    parent.postMessage({ pluginMessage: { type: "close" } }, "*");
+  });
+
+  // ── 메시지 수신 ──
+  window.addEventListener("message", async (event) => {
+    const msg = event.data && event.data.pluginMessage;
+    if (!msg) return;
+
+    if (msg.type === "progress") {
+      log(msg.message, "info");
+    } else if (msg.type === "error") {
+      log("✗ " + msg.message, "error");
+      _chainImageGenAfterApply = null;
+      setBusy(false);
+    } else if (msg.type === "load_ppt_done") {
+      log("✓ Figma 배치 완료 — 슬라이드 " + msg.slideCount + "장", "ok");
+      if (msg.workWarning) log("  ⚠ " + msg.workWarning, "warn");
+      setBusy(false);
+    } else if (msg.type === "load_ppt_error") {
+      log("✗ Figma 배치 실패: " + msg.message, "error"); setBusy(false);
+    } else if (msg.type === "popup_templates") {
+      refreshPopupDropdowns(msg.templates);
+    } else if (msg.type === "popup_register_done") {
+      const typeName = _typeOf(msg.name) === "banner" ? "배너" : "팝업";
+      log("✓ " + typeName + " 등록 완료 (총 " + msg.templates.length + "종)", "ok");
+      log("  " + formatPopupName(msg.name), "info");
+      if (msg.textNames && msg.textNames.length > 0) {
+        log("  placeholder " + (msg.placeholder_count || msg.textNames.length) + "개:", "info");
+        msg.textNames.forEach((n, i) => log("    " + (i + 1) + ". " + n, "muted"));
+      }
+      refreshPopupDropdowns(msg.templates, msg.key); setBusy(false);
+    } else if (msg.type === "popup_template_deleted") {
+      log("✓ 등록 삭제 완료 (남은 " + msg.templates.length + "종)", "ok");
+      refreshPopupDropdowns(msg.templates); setBusy(false);
+    } else if (msg.type === "popup_apply_done") {
+      log("✓ 적용 완료 — " + formatPopupName(msg.template_name || ""), "ok");
+      log("  텍스트 " + msg.text_count + "개 → " + msg.filled + "개 채움", "info");
+      if (msg.mapping_log && msg.mapping_log.length > 0) {
+        log("  매핑:", "info"); msg.mapping_log.forEach(m => log("    " + m, "muted"));
+      }
+      if (msg.detached) log("  ✓ 자동 detach 완료", "info");
+      if (msg.renamed_from && msg.renamed_to)
+        log("  ✓ 이름 정리: " + msg.renamed_from + " → " + msg.renamed_to, "muted");
+      if (msg.font_fallbacks && msg.font_fallbacks.length > 0)
+        msg.font_fallbacks.forEach(f => log("  ⚠ 폰트 fallback: " + f, "warn"));
+      if (msg.excluded_count > 0) log("  자동 제외 " + msg.excluded_count + "개", "muted");
+      (msg.warnings || []).forEach(w => log("  ⚠ " + w, "warn"));
+
+      // [적용 + 이미지 생성] 체인 — 적용 직후 자동으로 이미지 생성 이어감
+      if (_chainImageGenAfterApply) {
+        const chain = _chainImageGenAfterApply;
+        _chainImageGenAfterApply = null;
+        log("이어서 이미지 생성 준비 중...", "muted");
+        _imageGenPending = { kind: chain.kind, extraHint: chain.extraHint };
+        _imgGenSetStage("이미지 자리 탐색 중…", "");
+        parent.postMessage({
+          pluginMessage: { type: "image_generate_prepare", kind: chain.kind, extraHint: chain.extraHint },
+        }, "*");
+        // busy 유지 — image_generate_done / _error 에서 해제됨
+      } else {
+        setBusy(false);
+      }
+    } else if (msg.type === "image_generate_context") {
+      // code.js 가 보낸 컨텍스트 → Helper /generate-image 비동기 job 시작 → polling
+      const pending = _imageGenPending || { kind: "popup", extraHint: null };
+      if (!_imgGenActiveKind) _imgGenStart(pending.kind);
+      _imgGenSetStage("이미지 생성 중…", "GPT 프롬프트 작성");
+      log("  대상: " + msg.targetName + " (" + msg.width + "×" + msg.height + ")", "info");
+      log("  텍스트 " + (msg.texts ? msg.texts.length : 0) + "개 → GPT 프롬프트 생성 + gpt-image-1 호출 중...", "muted");
+      try {
+        const startResp = await fetch(HELPER_BASE + "/generate-image", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            texts: msg.texts || [],
+            width: msg.width,
+            height: msg.height,
+            kind: pending.kind,
+            extra_hint: pending.extraHint,
+          }),
+        });
+        if (!startResp.ok) {
+          const txt = await startResp.text();
+          log("✗ Helper 오류 " + startResp.status + ": " + txt, "error");
+          _imgGenStop();
+          setBusy(false);
+          _imageGenPending = null;
+          return;
+        }
+        const startData = await startResp.json();
+        const jobId = startData.job_id;
+        if (!jobId) {
+          log("✗ Helper 응답에 job_id 가 없습니다.", "error");
+          _imgGenStop();
+          setBusy(false);
+          _imageGenPending = null;
+          return;
+        }
+
+        const data = await pollImageJob(jobId);
+        if (!data) {
+          _imgGenStop();
+          setBusy(false);
+          _imageGenPending = null;
+          return;
+        }
+        if (data.prompt) log("  ✓ 프롬프트: " + data.prompt.slice(0, 120) + (data.prompt.length > 120 ? "…" : ""), "muted");
+        if (data.background_color) log("  ✓ dominant pastel: " + data.background_color, "muted");
+        log("  ✓ 이미지 받음 (" + data.size + ") — Figma 에 적용 중...", "muted");
+        _imgGenSetStage("Figma 에 적용 중…", "이미지 fill + 프레임 배경색 설정");
+        parent.postMessage({
+          pluginMessage: {
+            type: "image_generate_apply",
+            targetNodeId: msg.targetNodeId,
+            frameNodeId: msg.frameNodeId,
+            backgroundColor: data.background_color,
+            base64: data.image_base64,
+            prompt: data.prompt,
+          },
+        }, "*");
+      } catch (e) {
+        log("✗ Helper 연결 실패: " + e.message, "error");
+        _imgGenStop();
+        setBusy(false);
+        _imageGenPending = null;
+      }
+    } else if (msg.type === "image_generate_done") {
+      log("✓ 이미지 생성 완료 — " + msg.targetName, "ok");
+      if (msg.frameBgApplied) {
+        if (String(msg.frameBgApplied).indexOf("ERROR") === 0)
+          log("  ⚠ 프레임 배경색 적용 실패: " + msg.frameBgApplied.slice(7), "warn");
+        else
+          log("  ✓ 프레임 배경색 적용: " + msg.frameBgApplied, "info");
+      }
+      _imgGenStop();
+      setBusy(false);
+      _imageGenPending = null;
+    } else if (msg.type === "image_generate_error") {
+      log("✗ " + msg.message, "error");
+      _imgGenStop();
+      setBusy(false);
+      _imageGenPending = null;
+      _chainImageGenAfterApply = null;
+    } else if (msg.type === "detail_sections_loaded") {
+      refreshDsSectionDropdowns(msg.templates);
+    } else if (msg.type === "detail_section_registered") {
+      log("✓ [" + (DS_TYPE_LABEL[msg.sectionType] || msg.sectionType) + "] 템플릿 등록: " + msg.name, "ok");
+      refreshDsSectionDropdowns(msg.templates);
+      dsRegNameInput.value = ""; setBusy(false);
+    } else if (msg.type === "detail_section_deleted") {
+      log("✓ 템플릿 삭제 완료 (남은 " + msg.templates.length + "개)", "ok");
+      refreshDsSectionDropdowns(msg.templates); setBusy(false);
+    } else if (msg.type === "detail_section_applied") {
+      const textNote = msg.usedDefaultText ? " (기본 텍스트)" : " (선택 텍스트 적용)";
+      log("✓ [" + (DS_TYPE_LABEL[msg.sectionType] || msg.sectionType) + "] " + msg.templateName + " 배치 완료" + textNote, "ok");
+      setBusy(false);
+    } else if (msg.type === "detail_section_apply_error") {
+      log("✗ 섹션 배치 실패: " + msg.message, "error"); setBusy(false);
+    } else if (msg.type === "config_exported") {
+      const blob = new Blob([JSON.stringify(msg.config, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "promo-plugin-config.json"; a.click();
+      URL.revokeObjectURL(url);
+      log("✓ 설정 내보내기 완료 (팝업/배너 " + (msg.config.popupTemplates || []).length + "종, 상세 " + (msg.config.detailTemplates || []).length + "개)", "ok");
+    } else if (msg.type === "config_imported") {
+      log("✓ 설정 가져오기 완료 — 팝업/배너 " + msg.popupCount + "종, 상세 " + msg.detailCount + "개", "ok");
+      refreshPopupDropdowns(msg.popupTemplates);
+      refreshDsSectionDropdowns(msg.detailTemplates);
+      setBusy(false);
+    } else if (msg.type === "extracted") {
+      (msg.warnings || []).forEach(w => log("⚠ " + w, "warn"));
+      log("추출 " + msg.files.length + "개 완료. Helper 호출 중...", "muted");
+      try {
+        if (msg.mode === "upload") await callPackageAndUpload(msg);
+        else await callPackage(msg);
+      } catch (e) { log("Helper 호출 실패: " + (e && e.message ? e.message : e), "error"); }
+      setBusy(false);
+    }
+
+    if (!logOpen && logEntryCount > 0) logCount.textContent = logEntryCount + "줄";
+  });
+
+  // /generate-image job 을 1.5초 간격으로 polling. 최대 3분.
+  // 성공 시 { image_base64, prompt, size } 반환, 실패/타임아웃 시 null 반환 (로그는 안에서 처리).
+  async function pollImageJob(jobId) {
+    const intervalMs = 1500;
+    const maxMs = 180000;
+    const start = Date.now();
+    let lastStage = null;
+    while (Date.now() - start < maxMs) {
+      await new Promise(r => setTimeout(r, intervalMs));
+      let resp;
+      try {
+        resp = await fetch(HELPER_BASE + "/generate-image/" + encodeURIComponent(jobId));
+      } catch (e) {
+        log("✗ Helper 연결 끊김: " + e.message, "error");
+        return null;
+      }
+      if (!resp.ok) {
+        const txt = await resp.text();
+        log("✗ Helper 상태 조회 실패 " + resp.status + ": " + txt, "error");
+        return null;
+      }
+      const data = await resp.json();
+      if (data.stage && data.stage !== lastStage) {
+        lastStage = data.stage;
+        if (data.stage === "prompt") {
+          log("  · 프롬프트 생성 중...", "muted");
+          _imgGenSetStage("이미지 생성 중…", "GPT-4o-mini 프롬프트 작성 중");
+        } else if (data.stage === "image") {
+          log("  · gpt-image-1 이미지 생성 중...", "muted");
+          _imgGenSetStage("이미지 생성 중…", "gpt-image-1 그리는 중 (보통 15~25초)");
+        }
+      }
+      if (data.status === "completed") return data;
+      if (data.status === "failed") {
+        log("✗ 이미지 생성 실패: " + (data.error || "(원인 미상)"), "error");
+        return null;
+      }
+    }
+    log("✗ 이미지 생성 타임아웃 (3분 초과)", "error");
+    return null;
+  }
+
+  async function callPackage(payload) {
+    const resp = await fetch(HELPER_BASE + "/package", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: payload.files, metadata: payload.metadata, splits: payload.splits || [] }),
+    });
+    if (!resp.ok) { log("Helper 오류 " + resp.status + ": " + await resp.text(), "error"); return; }
+    const r = await resp.json();
+    const c = payload.metadata.counts;
+    log("✓ zip 생성 완료", "ok");
+    log("  " + r.zip_path + " · " + r.file_count + "개 · " + (r.bytes / 1024).toFixed(1) + " KB", "info");
+    log("  배너 " + c.banner + ", 팝업 " + c.popup + ", 랜딩 " + c.landing, "info");
+  }
+
+  async function callPackageAndUpload(payload) {
+    const resp = await fetch(HELPER_BASE + "/package_and_upload", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: payload.files, metadata: payload.metadata, jira_key: payload.jiraKey, splits: payload.splits || [] }),
+    });
+    if (!resp.ok) { log("Helper 오류 " + resp.status + ": " + await resp.text(), "error"); return; }
+    const r = await resp.json();
+    const c = payload.metadata.counts;
+    log("✓ Way 업로드 완료", "ok");
+    log("  이슈: " + r.issue_key + " (reporter: " + (r.reporter_display || r.reporter_username || "-") + ")", "info");
+    log("  zip: " + r.zip_filename + " · " + r.file_count + "개 · " + (r.bytes / 1024).toFixed(1) + " KB", "info");
+    if (r.is_revision) log("  ※ 수정본 #" + r.revision_index + " 으로 인식됨", "warn");
+    log("  배너 " + c.banner + ", 팝업 " + c.popup + ", 랜딩 " + c.landing, "info");
+    log("--- 댓글 ---", "bold"); log(r.comment, "info");
+  }
+</script>
+</body>
+</html>

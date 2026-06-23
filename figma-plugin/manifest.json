@@ -1,0 +1,12 @@
+{
+  "name": "Promotion Automation",
+  "id": "konai-promotion-automation",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "로컬 Helper(127.0.0.1:7000)로 추출된 PNG를 전송하여 zip 패키징 및 Way(Jira) 첨부·댓글 자동 등록을 수행합니다. 실제 호출 대상은 localhost 한 곳이며 외부 도메인 접근은 없습니다."
+  }
+}

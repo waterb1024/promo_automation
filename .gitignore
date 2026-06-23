@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# 민감 정보 — 절대 커밋 금지
+helper/.env
+helper/.figma-cookies.json
+helper/processed-emails.json
+helper/.processed-comments.json
+helper/figma-invite.log
+helper/konai-ca.pem
+
+# 배포용 zip (안에 .env 등 들어있을 수 있음)
+promo-automation.zip
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node
+node_modules/
+helper/node_modules/
+
+# 에디터/툴
+.claude/
+.idea/
+.vscode/
+*.swp
