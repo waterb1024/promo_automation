@@ -127,6 +127,8 @@ class Config:
     way_password: Optional[str] = None
     default_file_key: Optional[str] = None
     openai_api_key: Optional[str] = None
+    templates_sync_url: Optional[str] = None
+    templates_sync_token: Optional[str] = None
 
     @property
     def way_api_base(self) -> str:
@@ -168,6 +170,13 @@ def load_config(path: Optional[Path] = None) -> Config:
         if env_key:
             openai_api_key = env_key
 
+    templates_sync_url = (raw.get("templates_sync_url") or "").strip() or None
+    templates_sync_token = (raw.get("templates_sync_token") or "").strip() or None
+    if not templates_sync_token:
+        env_token = os.environ.get("TEMPLATES_SYNC_TOKEN", "").strip()
+        if env_token:
+            templates_sync_token = env_token
+
     missing = []
     if not way_base_url:
         missing.append("way_base_url")
@@ -195,6 +204,7 @@ def load_config(path: Optional[Path] = None) -> Config:
     return _build_config(
         way_base_url, output_dir, way_pat, way_username, way_password,
         default_file_key, openai_api_key,
+        templates_sync_url, templates_sync_token,
     )
 
 
@@ -226,7 +236,8 @@ def _ensure_writable(target: Path, fallback: Path) -> Path:
 
 
 def _build_config(way_base_url, output_dir, way_pat, way_username, way_password,
-                  default_file_key, openai_api_key=None):
+                  default_file_key, openai_api_key=None,
+                  templates_sync_url=None, templates_sync_token=None):
     return Config(
         way_base_url=way_base_url,
         output_dir=output_dir,
@@ -235,6 +246,8 @@ def _build_config(way_base_url, output_dir, way_pat, way_username, way_password,
         way_password=way_password,
         default_file_key=default_file_key,
         openai_api_key=openai_api_key,
+        templates_sync_url=templates_sync_url,
+        templates_sync_token=templates_sync_token,
     )
 
 

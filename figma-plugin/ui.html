@@ -463,6 +463,12 @@
         <button id="cfg-import-btn" class="btn-reg" style="font-size:11px;">↓ 가져오기</button>
         <input type="file" id="cfg-import-input" accept=".json" style="display:none;" />
       </div>
+      <p style="font-size:10.5px;color:#6a7689;margin:8px 0 8px;line-height:1.4;">
+        팀 공용 저장소 (GitHub 등) 에서 최신 템플릿 설정을 받아옵니다. URL 은 helper config 의 <code>templates_sync_url</code>.
+      </p>
+      <div class="btn-row">
+        <button id="cfg-remote-sync" class="btn-reg" style="font-size:11px;">⟳ 원격 설정 동기화</button>
+      </div>
     </div>
 
   </div>
@@ -1094,6 +1100,27 @@
       } catch (err) { log("✗ JSON 파싱 실패: " + err.message, "error"); }
     };
     reader.readAsText(file);
+  });
+
+  // 원격 설정 동기화 — helper 가 GitHub raw 등에서 fetch → import_config 재사용
+  document.getElementById("cfg-remote-sync").addEventListener("click", async () => {
+    setBusy(true);
+    log("원격 설정 fetch 중...", "muted");
+    try {
+      const resp = await fetch(HELPER_BASE + "/templates/fetch");
+      if (!resp.ok) {
+        let detail = "";
+        try { detail = (await resp.json()).detail || ""; } catch (e) {}
+        throw new Error("HTTP " + resp.status + (detail ? " — " + detail : ""));
+      }
+      const data = await resp.json();
+      if (!data || !data.config) throw new Error("응답에 config 가 없습니다.");
+      log("원격 fetch OK (" + (data.source_url || "URL 미상") + ") — 적용 중...", "muted");
+      parent.postMessage({ pluginMessage: { type: "import_config", config: data.config } }, "*");
+    } catch (err) {
+      setBusy(false);
+      log("✗ 원격 동기화 실패: " + (err && err.message ? err.message : String(err)), "error");
+    }
   });
 
   closeBtn.addEventListener("click", () => {

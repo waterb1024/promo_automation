@@ -1,6 +1,8 @@
 {
-  "first_upload": "{mention} 매니저님, {counts_text} 전달드립니다.\n\n[^{zip_filename}]",
-  "revision":     "{mention} 매니저님, 수정사항 반영하여 {counts_text} 전달드립니다.\n\n[^{zip_filename}]",
+  "first_upload":       "{mention} 매니저님, {counts_text} 전달드립니다.\n\n[^{zip_filename}]",
+  "revision":           "{mention} 매니저님, 수정사항 반영하여 {counts_text} 전달드립니다.\n\n[^{zip_filename}]",
+  "first_upload_image": "{mention} 매니저님, {counts_text} 전달드립니다.\n\n!{zip_filename}|thumbnail!",
+  "revision_image":     "{mention} 매니저님, 수정사항 반영하여 {counts_text} 전달드립니다.\n\n!{zip_filename}|thumbnail!",
 
   "_notes": [
     "{mention}      → Jira reporter 멘션 (Server/DC: [~username] 형식)",
@@ -9,7 +11,8 @@
     "                  예) banner=0, popup=2, landing=1 → '팝업2개, 랜딩페이지1개'",
     "                  예) banner=2, popup=0, landing=0 → '배너2개'",
     "                  예) 모두 0  → '시안'",
-    "{zip_filename} → 이번에 첨부한 zip 파일명. [^...] 로 감싸면 다운로드 링크로 렌더링.",
+    "{zip_filename} → 이번에 첨부한 파일명. [^...] 는 다운로드 링크, !...! 는 인라인 이미지 임베드.",
+    "_image 접미     → 배너/팝업 1장만 있는 단일 이미지 모드에서 사용 (zip 대신 png/jpg 직첨부)",
     "{banner}       → banner 타입 프레임 수 (legacy — counts_text 권장)",
     "{popup}        → popup 타입 프레임 수 (legacy)",
     "{landing}      → landing 타입 메인 프레임 수 (legacy)",

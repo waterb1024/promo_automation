@@ -504,15 +504,106 @@ def health():
         ),
         "openai_loaded": bool(CONFIG and CONFIG.openai_api_key),
         "openai_env_present": "OPENAI_API_KEY" in _os.environ,
+        "templates_sync_configured": bool(CONFIG and CONFIG.templates_sync_url),
     }
+
+
+@app.get("/templates/fetch")
+def templates_fetch():
+    """
+    config 의 templates_sync_url 에서 templates JSON 을 받아 그대로 반환.
+    URL 예: GitHub raw — https://raw.githubusercontent.com/<org>/<repo>/<branch>/templates.json
+    Private repo 면 templates_sync_token 으로 Authorization: Bearer 헤더 추가.
+    """
+    import urllib.error
+    import urllib.request
+
+    if CONFIG is None or not CONFIG.templates_sync_url:
+        raise HTTPException(
+            503,
+            "templates_sync_url 이 config 에 없습니다. "
+            "~/.promo-export/config.json 에 \"templates_sync_url\" 추가 후 helper 재시작.",
+        )
+
+    url = CONFIG.templates_sync_url
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("Accept", "application/json")
+    if CONFIG.templates_sync_token:
+        req.add_header("Authorization", f"Bearer {CONFIG.templates_sync_token}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        raise HTTPException(
+            502,
+            f"원격 templates fetch 실패: HTTP {e.code} ({url}). "
+            "private repo 면 templates_sync_token 확인.",
+        )
+    except urllib.error.URLError as e:
+        raise HTTPException(502, f"원격 templates fetch 실패: {e.reason} ({url})")
+
+    try:
+        config = json.loads(body)
+    except json.JSONDecodeError as e:
+        raise HTTPException(502, f"원격 templates JSON 파싱 실패: {e}")
+
+    if not isinstance(config, dict) or config.get("version") != 1:
+        raise HTTPException(502, "원격 templates 형식이 잘못됐습니다 (version=1 인 JSON 필요).")
+
+    return {"ok": True, "config": config, "source_url": url}
+
+
+def _is_single_image_mode(req) -> bool:
+    """배너 또는 팝업이 1개뿐(랜딩 0, split 없음, 파일 1장)이면 zip 대신 이미지 직접 첨부."""
+    counts = req.metadata.counts
+    return (
+        counts.landing == 0
+        and (counts.banner + counts.popup) == 1
+        and len(req.files) == 1
+        and not req.splits
+    )
+
+
+def _decode_single_image(file: FileEntry) -> tuple[bytes, str]:
+    """단일 이미지 base64 디코드 + 확장자 검증."""
+    _safe_filename(file.filename)  # 형식 검증
+    ext = file.filename.rsplit(".", 1)[-1].lower()
+    if ext == "jpeg":
+        ext = "jpg"
+    if ext not in ("png", "jpg"):
+        raise HTTPException(400, f"단일 이미지 확장자가 png/jpg 가 아닙니다: {file.filename}")
+    try:
+        data = base64.b64decode(file.base64, validate=True)
+    except Exception as e:
+        raise HTTPException(400, f"base64 디코드 실패: {file.filename} ({e})")
+    return data, ext
 
 
 @app.post("/package")
 def package(req: PackageRequest):
-    """zip 만 만든다 — Way 호출 없음. dry-run / 검수용."""
+    """zip(또는 단일 이미지) 생성만 — Way 호출 없음. dry-run / 검수용."""
     if not req.files:
         raise HTTPException(400, "파일이 비어 있습니다.")
     base = f"{req.metadata.date}_{req.metadata.promotion}"
+
+    # 배너/팝업 1장만 있으면 zip 대신 png/jpg 그대로 저장
+    if _is_single_image_mode(req):
+        data, ext = _decode_single_image(req.files[0])
+        out_path = OUTPUT_DIR / f"{base}.{ext}"
+        if out_path.exists():
+            ts = datetime.now().strftime("%H%M%S")
+            out_path = OUTPUT_DIR / f"{base}_{ts}.{ext}"
+        out_path.write_bytes(data)
+        log.info("[package] 단일 이미지 저장 OK: %s (%d bytes)", out_path, len(data))
+        return {
+            "ok": True,
+            "zip_path": str(out_path),
+            "file_count": 1,
+            "bytes": len(data),
+            "single_image_mode": True,
+        }
+
     zip_path = OUTPUT_DIR / f"{base}.zip"
     if zip_path.exists():
         ts = datetime.now().strftime("%H%M%S")
@@ -543,20 +634,11 @@ def package(req: PackageRequest):
 
 @app.post("/package_and_upload")
 def package_and_upload(req: PackageAndUploadRequest):
-    """zip 생성 → Way 이슈에 첨부 + 댓글 등록. 메인 워크플로우."""
+    """zip(또는 단일 이미지) 생성 → Way 이슈에 첨부 + 댓글 등록. 메인 워크플로우."""
     if not req.files:
         raise HTTPException(400, "파일이 비어 있습니다.")
 
-    # 0) 분할 spec 이 있으면 PIL crop 으로 PNG 추가
-    expanded_files = _apply_splits(req.files, req.splits)
-    if len(expanded_files) != len(req.files):
-        log.info(
-            "[upload] split 처리 결과: %d 파일 → %d 파일",
-            len(req.files), len(expanded_files),
-        )
-
-    # landing 메인 + 자식 PNG 를 한 폴더로 묶기
-    expanded_files = _organize_landing_folders(expanded_files)
+    single_image_mode = _is_single_image_mode(req)
 
     jira = _get_jira_client()
 
@@ -566,35 +648,66 @@ def package_and_upload(req: PackageAndUploadRequest):
         issue = jira.get_issue(req.jira_key)
     except JiraError as e:
         raise HTTPException(502, f"Way 이슈 조회 실패: {e}")
+    existing_attachments = [a.filename for a in issue.attachments]
 
-    # 2) 수정본 자동 판별 + zip 파일명 결정
-    existing_zips = [a.filename for a in issue.attachments]
-    decision = decide_revision(
-        req.metadata.date, req.metadata.promotion, existing_zips
-    )
-    zip_path = OUTPUT_DIR / decision.zip_filename
-    log.info(
-        "[upload] zip 파일명 결정: %s (revision=%s, index=%d, 기존 첨부=%d개)",
-        decision.zip_filename, decision.is_revision, decision.revision_index,
-        len(existing_zips),
-    )
+    if single_image_mode:
+        # 배너/팝업 1장 → zip 없이 png/jpg 그대로 첨부
+        data, ext = _decode_single_image(req.files[0])
+        decision = decide_revision(
+            req.metadata.date, req.metadata.promotion, existing_attachments,
+            extension=ext,
+        )
+        attach_path = OUTPUT_DIR / decision.zip_filename
+        attach_path.write_bytes(data)
+        bytes_written = len(data)
+        file_count = 1
+        log.info(
+            "[upload] 단일 이미지 모드: %s (%d bytes, revision=%s, index=%d, 기존 첨부=%d개)",
+            decision.zip_filename, bytes_written,
+            decision.is_revision, decision.revision_index,
+            len(existing_attachments),
+        )
+    else:
+        # 분할 spec 이 있으면 PIL crop 으로 PNG 추가
+        expanded_files = _apply_splits(req.files, req.splits)
+        if len(expanded_files) != len(req.files):
+            log.info(
+                "[upload] split 처리 결과: %d 파일 → %d 파일",
+                len(req.files), len(expanded_files),
+            )
+        # landing 메인 + 자식 PNG 를 한 폴더로 묶기
+        expanded_files = _organize_landing_folders(expanded_files)
 
-    # 3) zip 생성 (분할 처리된 expanded_files 사용)
-    entries = _build_entries(expanded_files)
-    bytes_written = write_utf8_zip(zip_path, entries)
-    log.info("[upload] zip 생성 OK: %s (%d bytes, %d files)",
-             zip_path, bytes_written, len(entries))
+        decision = decide_revision(
+            req.metadata.date, req.metadata.promotion, existing_attachments,
+        )
+        attach_path = OUTPUT_DIR / decision.zip_filename
+        log.info(
+            "[upload] zip 파일명 결정: %s (revision=%s, index=%d, 기존 첨부=%d개)",
+            decision.zip_filename, decision.is_revision, decision.revision_index,
+            len(existing_attachments),
+        )
 
-    # 4) Way 첨부
+        # zip 생성 (분할 처리된 expanded_files 사용)
+        entries = _build_entries(expanded_files)
+        bytes_written = write_utf8_zip(attach_path, entries)
+        file_count = len(entries)
+        log.info("[upload] zip 생성 OK: %s (%d bytes, %d files)",
+                 attach_path, bytes_written, file_count)
+
+    # Way 첨부
     log.info("[upload] Way 첨부 업로드 → %s", req.jira_key)
     try:
-        jira.upload_attachment(req.jira_key, zip_path)
+        jira.upload_attachment(req.jira_key, attach_path)
     except JiraError as e:
         raise HTTPException(502, f"Way 첨부 업로드 실패: {e}")
 
     # 5) 댓글 등록 (템플릿 + reporter 멘션)
     templates = json.loads(COMMENT_TEMPLATES_PATH.read_text(encoding="utf-8"))
     tpl_key = "revision" if decision.is_revision else "first_upload"
+    if single_image_mode:
+        # 단일 이미지면 다운로드 링크 대신 인라인 이미지로 렌더링되는 템플릿 사용
+        tpl_key = f"{tpl_key}_image"
     tpl = templates[tpl_key]
     mention = (
         f"[~{issue.reporter_username}]" if issue.reporter_username else "@reporter"
@@ -616,20 +729,21 @@ def package_and_upload(req: PackageAndUploadRequest):
     except JiraError as e:
         raise HTTPException(502, f"Way 댓글 등록 실패: {e}")
 
-    log.info("[upload] 완료: issue=%s, zip=%s", req.jira_key, decision.zip_filename)
+    log.info("[upload] 완료: issue=%s, attach=%s", req.jira_key, decision.zip_filename)
     return {
         "ok": True,
-        "zip_path": str(zip_path),
+        "zip_path": str(attach_path),
         "zip_filename": decision.zip_filename,
         "is_revision": decision.is_revision,
         "revision_index": decision.revision_index,
-        "file_count": len(entries),
+        "file_count": file_count,
         "bytes": bytes_written,
         "issue_key": req.jira_key,
         "reporter_username": issue.reporter_username,
         "reporter_display": issue.reporter_display,
         "counts": req.metadata.counts.model_dump(),
         "comment": comment,
+        "single_image_mode": single_image_mode,
     }
 
 
