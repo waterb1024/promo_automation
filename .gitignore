@@ -9,6 +9,17 @@ helper/.processed-comments.json
 helper/figma-invite.log
 helper/konai-ca.pem
 
+# Figma 초대 자동화 스크립트 — 로컬 개발 도구, 시크릿 하드코딩 우려
+helper/figma-invite-poller.js
+helper/invite-figma.js
+helper/save-cookies.js
+helper/test-login.js
+helper/run-figma-invite.sh
+
+# Node 아티팩트 (helper 는 puppeteer 로컬 실행용, git 에 굳이 필요 없음)
+helper/package.json
+helper/package-lock.json
+
 # 배포용 zip (안에 .env 등 들어있을 수 있음)
 promo-automation.zip
 *.zip

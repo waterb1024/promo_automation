@@ -130,11 +130,14 @@ class GenerateImageRequest(BaseModel):
     texts: List[str] = Field(default_factory=list, description="팝업/배너의 텍스트들 (위→아래 순). 프롬프트 생성에 사용")
     width: int = Field(..., ge=64, le=4096, description="채울 사각형의 width (px)")
     height: int = Field(..., ge=64, le=4096, description="채울 사각형의 height (px)")
-    kind: str = Field("popup", description="popup | banner — 톤·스타일 힌트")
+    kind: str = Field("popup", description="popup | banner | sotong — 톤·스타일 힌트")
     extra_hint: Optional[str] = Field(None, description="사용자가 직접 추가하는 스타일/제약 힌트 (선택)")
     style: str = Field("3d", description="3d | photoreal | illustration")
     emphasize_numbers: bool = Field(False, description="텍스트의 금액·퍼센트를 이미지에 강조 표시할지 (기본 off)")
     feedback: Optional[str] = Field(None, description="재생성 시 사용자가 입력한 피드백 — 무엇을 바꾸고 싶은지")
+    subject: Optional[str] = Field(None, description="소통참여 등에서 사용자가 직접 지정한 이미지 주제. 값이 있으면 GPT 개체명 추출을 건너뛰고 그대로 사용.")
+    prompt_template: Optional[str] = Field(None, description="주어지면 이 템플릿의 {subject} 자리에 subject/추출값을 끼워 최종 프롬프트로 사용. 없으면 style 기반 기본 템플릿 사용.")
+    transparent_background: bool = Field(True, description="gpt-image-1 background='transparent' 여부. 실사 사진에는 False 권장.")
 
 
 # -------- 유틸 --------
@@ -999,16 +1002,78 @@ def _extract_highlight_numbers(texts: List[str]) -> List[str]:
     return out
 
 
+def _sanitize_subject_for_no_text(subject: str) -> str:
+    """
+    소통참여 등 '실사 사진 + 텍스트 금지' 프롬프트에서 주제 정제.
+
+    괄호는 보통 '이름(설명)' 패턴으로 쓰여서 시각적으로 의미가 있는 건 괄호 안.
+    → 괄호 안 설명을 살리고 앞 이름은 버린다.
+
+    예:
+      '드림나래(면접정장대여)' → '면접정장대여'
+      '카페(따뜻한 실내)'     → '따뜻한 실내'
+      '아이스크림'              → '아이스크림' (괄호 없으면 그대로)
+
+    여러 개의 괄호가 있으면 마지막 괄호 안 내용을 사용.
+    괄호 안이 비어 있으면 앞부분을 fallback 으로 유지.
+    """
+    if not subject:
+        return subject
+    s = subject
+    # 마지막 괄호 안 내용 추출 (전각/반각 모두)
+    matches = re.findall(r"[\(（]([^\)）]*)[\)）]", s)
+    inner = None
+    for m in reversed(matches):
+        stripped = m.strip()
+        if stripped:
+            inner = stripped
+            break
+    if inner:
+        s = inner
+    else:
+        # 괄호가 없거나 안이 비어있음 → 대괄호 제거만 하고 원본 사용
+        s = re.sub(r"\s*[\(（][^\)）]*[\)）]\s*", " ", s)
+    # 대괄호는 부수적 메타 정보라고 보고 제거
+    s = re.sub(r"\s*\[[^\]]*\]\s*", " ", s)
+    # 언더스코어/연속 공백 정리
+    s = re.sub(r"[_\s]+", " ", s).strip()
+    return s or subject
+
+
 def _build_image_prompt(texts: List[str], kind: str,
                         extra_hint: Optional[str], style: str = DEFAULT_IMAGE_STYLE,
                         emphasize_numbers: bool = False,
-                        feedback: Optional[str] = None) -> str:
+                        feedback: Optional[str] = None,
+                        subject_override: Optional[str] = None,
+                        prompt_template: Optional[str] = None) -> str:
     """
     GPT-4o-mini 로 한국어 텍스트에서 핵심 개체명(영어 명사구) 만 뽑아
     고정 스타일 템플릿에 끼워 넣어 반환.
     실패 시 텍스트를 직접 사용한 fallback.
+
+    subject_override 가 주어지면 GPT 추출을 건너뛰고 그대로 사용.
+    prompt_template 가 주어지면 style 기반 기본 템플릿 대신 이 템플릿의
+      {subject} 자리에 subject 를 끼워 최종 프롬프트를 만든다.
     """
     from openai import OpenAI
+
+    # subject 직접 지정 경로 (소통참여 등)
+    if subject_override and subject_override.strip():
+        subject = _sanitize_subject_for_no_text(subject_override.strip())
+        template = prompt_template or (
+            IMAGE_PROMPT_TEMPLATES.get(style) or IMAGE_PROMPT_TEMPLATES[DEFAULT_IMAGE_STYLE]
+        )
+        prompt = template.format(subject=subject)
+        if extra_hint:
+            prompt += ", " + extra_hint.strip()
+        if feedback:
+            prompt += ", user refinement request: " + feedback.strip()
+        # 최종 안전장치: 프롬프트 맨 끝에도 텍스트 금지 재선언
+        prompt += (
+            " REMINDER: zero text, zero letters, zero characters, "
+            "zero signage, zero writing of any kind — this is critical."
+        )
+        return prompt
 
     joined = " / ".join(_annotate_korean_places(t.strip()) for t in texts if t and t.strip())
     if not joined:
@@ -1124,6 +1189,8 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
         prompt = _build_image_prompt(
             req.texts, req.kind, req.extra_hint, req.style,
             req.emphasize_numbers, req.feedback,
+            subject_override=req.subject,
+            prompt_template=req.prompt_template,
         )
         log.info("[generate-image:%s] 프롬프트: %s", job_id, prompt[:200])
         with _IMAGE_JOBS_LOCK:
@@ -1131,12 +1198,15 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             _IMAGE_JOBS[job_id]["prompt"] = prompt
 
         client = OpenAI(api_key=CONFIG.openai_api_key)
-        # background="transparent" → 알파 채널 PNG 로 받음.
-        # output_format="png" 명시 (transparent 는 png/webp 만 지원).
-        result = client.images.generate(
+        # transparent 요청 시에만 background='transparent' + png 명시.
+        # 실사 사진(소통참여 등) 은 opaque 로 받는다.
+        gen_kwargs = dict(
             model="gpt-image-1", prompt=prompt, size=size, n=1,
-            background="transparent", output_format="png",
+            output_format="png",
         )
+        if req.transparent_background:
+            gen_kwargs["background"] = "transparent"
+        result = client.images.generate(**gen_kwargs)
         if not result.data:
             raise RuntimeError("OpenAI 응답에 이미지 데이터가 없습니다.")
         b64 = getattr(result.data[0], "b64_json", None)

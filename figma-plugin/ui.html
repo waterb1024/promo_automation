@@ -266,6 +266,7 @@
       <button class="sub-tab-btn active" data-sub="sub-banner">배너</button>
       <button class="sub-tab-btn" data-sub="sub-popup">팝업</button>
       <button class="sub-tab-btn" data-sub="sub-detail">상세페이지</button>
+      <button class="sub-tab-btn" data-sub="sub-sotong">소통참여</button>
     </div>
     <div style="padding-top:10px;">
 
@@ -394,6 +395,47 @@
             <option value="">(등록된 템플릿 없음)</option>
           </select>
           <button id="ds-apply-btn" class="btn-apply">적용</button>
+        </div>
+      </div>
+
+      <!-- 소통참여 -->
+      <div class="sub-tab-content" id="sub-sotong">
+        <div class="card">
+          <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
+            프레임명 규칙: <code style="font-size:10px;">MMDD_image_소통참여_&#123;주제&#125;_top_984x552</code><br/>
+            프레임을 선택하면 이름에서 <b>주제</b>를 자동으로 뽑아냅니다.
+          </p>
+          <label class="lbl">선택된 프레임에서 감지된 주제</label>
+          <input class="text-input" id="sotong-detected-subject" readonly placeholder="(감지된 소통참여 프레임 없음 — 프레임을 선택하세요)" style="background:#f4f5f7;" />
+          <div id="sotong-detected-name" style="font-size:10px;color:#6a7689;margin:-4px 0 8px;font-family:'SF Mono',Menlo,monospace;word-break:break-all;"></div>
+          <button id="sotong-apply-selected" class="btn-apply" disabled>선택 프레임에 이미지 생성</button>
+
+          <div style="border-top:1px dashed #dbe5f2;margin:10px 0 10px;"></div>
+
+          <label class="lbl">주제로 새 프레임 만들기 + 이미지 생성</label>
+          <input class="text-input" id="sotong-new-subject" placeholder="예: 카페에서 대화하는 두 사람" style="margin-bottom:6px;" />
+          <button id="sotong-create-new" class="btn-apply">새 프레임 + 이미지 생성 (984x552)</button>
+
+          <div class="img-gen-status" id="sotong-img-gen-status">
+            <span class="timer" id="sotong-img-gen-timer">0s</span>
+            <span class="stage" id="sotong-img-gen-stage">준비 중…</span>
+            <div class="substep" id="sotong-img-gen-substep"></div>
+            <div class="bar"></div>
+          </div>
+          <div class="img-preview" id="sotong-img-preview">
+            <div class="img-preview-title">미리보기 (적용 전)</div>
+            <img class="img-preview-thumb" id="sotong-img-preview-thumb" alt="생성된 이미지" />
+            <div class="img-preview-prompt" id="sotong-img-preview-prompt"></div>
+            <label class="lbl" style="margin-top:6px;">재생성 코멘트 (선택)</label>
+            <textarea class="text-input" id="sotong-img-preview-feedback" rows="2"
+              placeholder="예: 더 밝은 톤으로, 실내가 아니라 야외로"
+              style="resize:vertical;font-family:inherit;margin-bottom:0;"></textarea>
+            <div class="img-preview-actions">
+              <button class="btn-apply" data-img-preview-apply="sotong">적용</button>
+              <button class="secondary" data-img-preview-regen="sotong">재생성</button>
+              <button class="btn-del" data-img-preview-cancel="sotong">취소</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -574,6 +616,26 @@
   const bannerApplyImageBtn = document.getElementById("banner-apply-image");
   const popupImgHintInput   = document.getElementById("popup-img-hint");
   const bannerImgHintInput  = document.getElementById("banner-img-hint");
+  // ── 소통참여 (실사 사진) ──
+  const sotongApplySelectedBtn = document.getElementById("sotong-apply-selected");
+  const sotongCreateNewBtn     = document.getElementById("sotong-create-new");
+  const sotongDetectedSubject  = document.getElementById("sotong-detected-subject");
+  const sotongDetectedName     = document.getElementById("sotong-detected-name");
+  const sotongNewSubjectInput  = document.getElementById("sotong-new-subject");
+  let _sotongSelectedInfo = null;  // { nodeId, name, subject, width, height } | null
+  // gpt-image-1 은 부정 지시를 프롬프트 끝에 두면 무시하는 경향이 있음.
+  // → 시작·중간·끝 3중으로 강조하고, 긍정문("wordless", "purely visual")도 섞음.
+  const SOTONG_PROMPT_TEMPLATE =
+    "STRICT RULE: This image must be completely wordless. " +
+    "Absolutely NO text, NO letters, NO characters, NO words, NO writing, " +
+    "NO signs, NO labels, NO logos, NO brand marks, NO watermarks, " +
+    "NO subtitles, NO captions, NO typography of any kind anywhere in the frame. " +
+    "A hyper-realistic photograph of {subject}, shot on a professional DSLR camera, " +
+    "natural lighting, high detail, sharp focus, realistic textures, " +
+    "photojournalistic style, 8k resolution. " +
+    "The scene contains zero readable characters — no Korean text, no English text, " +
+    "no numbers, no signage, no printed words, no digital overlays. " +
+    "Purely visual imagery only, no writing whatsoever.";
   // popup/banner 별 체크박스를 그때그때 조회하기 위한 헬퍼
   function _skipPreviewBox(kind) {
     return document.getElementById((kind || "popup") + "-skip-preview");
@@ -683,8 +745,8 @@
     // 어느 분기든 plugin window 는 원래 크기로 복원
     parent.postMessage({ pluginMessage: { type: "ui_resize", width: 440, height: 800 } }, "*");
     if (!_imgPreviewState) {
-      // 양쪽 다 닫기 (safety)
-      ["popup", "banner"].forEach(k => {
+      // 모든 kind 닫기 (safety)
+      ["popup", "banner", "sotong"].forEach(k => {
         const b = document.getElementById(k + "-img-preview");
         if (b) b.classList.remove("active");
       });
@@ -706,7 +768,12 @@
      bannerApplyBtn, bannerRegBtn, bannerDelBtn,
      popupApplyBtn, popupRegisterBtn, popupDeleteBtn,
      popupApplyImageBtn, bannerApplyImageBtn,
+     sotongCreateNewBtn,
      dsApplyBtn, dsRegAddBtn].forEach(el => { if (el) el.disabled = busy; });
+    // sotong-apply-selected 는 감지된 프레임 유무에 따로 컨트롤 → busy 만 반영
+    if (sotongApplySelectedBtn) {
+      sotongApplySelectedBtn.disabled = busy || !_sotongSelectedInfo;
+    }
   }
 
   // ── 팝업/배너 dropdown ──
@@ -913,6 +980,46 @@
   bannerApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("banner", bannerTypeSelect, bannerImgHintInput));
   popupApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("popup", popupTypeSelect, popupImgHintInput));
 
+  // ── 소통참여 (실사 사진) 트리거 ──
+  function _triggerSotongFromSelection() {
+    if (!_sotongSelectedInfo) {
+      log("✗ 소통참여 규칙에 맞는 프레임이 선택되지 않았습니다.", "error");
+      return;
+    }
+    _imageGenPending = {
+      kind: "sotong",
+      subject: _sotongSelectedInfo.subject,
+      extraHint: null,
+      style: "sotong",
+    };
+    setBusy(true);
+    _imgGenStart("sotong");
+    _imgGenSetStage("이미지 자리 준비 중…", _sotongSelectedInfo.name);
+    log("[소통참여] 선택 프레임 사용 — 주제: " + _sotongSelectedInfo.subject, "muted");
+    parent.postMessage({ pluginMessage: { type: "sotong_prepare_selected" } }, "*");
+  }
+  function _triggerSotongFromNewSubject() {
+    const subject = (sotongNewSubjectInput && sotongNewSubjectInput.value || "").trim();
+    if (!subject) {
+      log("✗ 주제를 입력해주세요.", "error");
+      sotongNewSubjectInput && sotongNewSubjectInput.focus();
+      return;
+    }
+    _imageGenPending = {
+      kind: "sotong",
+      subject: subject,
+      extraHint: null,
+      style: "sotong",
+    };
+    setBusy(true);
+    _imgGenStart("sotong");
+    _imgGenSetStage("새 프레임 생성 중…", "984x552");
+    log("[소통참여] 새 프레임 생성 + 이미지 생성 — 주제: " + subject, "muted");
+    parent.postMessage({ pluginMessage: { type: "sotong_prepare_new", subject: subject } }, "*");
+  }
+  if (sotongApplySelectedBtn) sotongApplySelectedBtn.addEventListener("click", _triggerSotongFromSelection);
+  if (sotongCreateNewBtn)     sotongCreateNewBtn.addEventListener("click", _triggerSotongFromNewSubject);
+
   // ── 일괄 처리 (selection 여러 frame) ──
   function _startBatch(kind, templateKey, style, extraHint, templateLabel) {
     _batchState = {
@@ -976,13 +1083,15 @@
     const s = _imgPreviewState;
     setBusy(true);
     _imgGenStart(s.kind);
-    _imgGenSetStage("Figma 에 적용 중…", "이미지 fill + 프레임 배경색 설정");
+    // 소통참여는 프레임 자체가 이미지 대상 → pastel 배경 덮어쓰기 방지
+    const isSotong = s.kind === "sotong";
+    _imgGenSetStage("Figma 에 적용 중…", isSotong ? "이미지 fill 설정" : "이미지 fill + 프레임 배경색 설정");
     parent.postMessage({
       pluginMessage: {
         type: "image_generate_apply",
         targetNodeId: s.context.targetNodeId,
-        frameNodeId: s.context.frameNodeId,
-        backgroundColor: s.bgColor,
+        frameNodeId: isSotong ? null : s.context.frameNodeId,
+        backgroundColor: isSotong ? null : s.bgColor,
         base64: s.base64,
         prompt: s.prompt,
       },
@@ -993,6 +1102,7 @@
   async function _previewRegen() {
     if (!_imgPreviewState) return;
     const s = _imgPreviewState;
+    const isSotong = s.kind === "sotong";
     const hintInput = document.getElementById(s.kind + "-img-hint");
     const styleSelect = document.getElementById(s.kind + "-img-style");
     const feedbackEl = document.getElementById(s.kind + "-img-preview-feedback");
@@ -1007,18 +1117,24 @@
     log("재생성 — hint=" + (newExtraHint || "(없음)") + ", style=" + newStyle +
         (feedback ? ", 코멘트=\"" + feedback + "\"" : ""), "muted");
     try {
+      const regenPayload = {
+        texts: ctx.texts || [],
+        width: ctx.width,
+        height: ctx.height,
+        kind: ctx.kind,
+        extra_hint: newExtraHint || ctx.extraHint,
+        style: newStyle,
+        emphasize_numbers: _emphasizeNumbersChecked(s.kind),
+        feedback: feedback,
+      };
+      if (isSotong) {
+        regenPayload.subject = ctx.subject || "";
+        regenPayload.prompt_template = SOTONG_PROMPT_TEMPLATE;
+        regenPayload.transparent_background = false;
+      }
       const startResp = await fetch(HELPER_BASE + "/generate-image", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          texts: ctx.texts || [],
-          width: ctx.width,
-          height: ctx.height,
-          kind: ctx.kind,
-          extra_hint: newExtraHint || ctx.extraHint,
-          style: newStyle,
-          emphasize_numbers: _emphasizeNumbersChecked(s.kind),
-          feedback: feedback,
-        }),
+        body: JSON.stringify(regenPayload),
       });
       if (!startResp.ok) {
         log("✗ Helper 오류 " + startResp.status + ": " + await startResp.text(), "error");
@@ -1165,6 +1281,17 @@
     } else if (msg.type === "selection_changed") {
       _selectionInfo = msg.info || { total: 0, frameCount: 0, frames: [] };
       _updateApplyImageButtonLabels();
+      // 소통참여 감지 상태 반영
+      _sotongSelectedInfo = msg.sotong || null;
+      if (sotongDetectedSubject) {
+        sotongDetectedSubject.value = _sotongSelectedInfo ? _sotongSelectedInfo.subject : "";
+      }
+      if (sotongDetectedName) {
+        sotongDetectedName.textContent = _sotongSelectedInfo ? _sotongSelectedInfo.name : "";
+      }
+      if (sotongApplySelectedBtn) {
+        sotongApplySelectedBtn.disabled = !_sotongSelectedInfo;
+      }
     } else if (msg.type === "popup_apply_batch_error") {
       // 일괄 처리 중 한 step 실패 — 진행 계속
       log("  ⚠ 일괄 처리 step 실패: " + (msg.message || ""), "warn");
@@ -1222,18 +1349,28 @@
       msg.extraHint = pending.extraHint || null;
       log("  대상: " + msg.targetName + " (" + msg.width + "×" + msg.height + ")", "info");
       log("  텍스트 " + (msg.texts ? msg.texts.length : 0) + "개, style=" + msg.style + " → GPT 프롬프트 + gpt-image-1 호출...", "muted");
+      // 소통참여: 고정 프롬프트 템플릿 + 사용자 지정 주제. 프레임에는 이미지 fill 만 적용.
+      const isSotong = pending.kind === "sotong";
+      const bodyPayload = {
+        texts: msg.texts || [],
+        width: msg.width,
+        height: msg.height,
+        kind: pending.kind,
+        extra_hint: pending.extraHint,
+        style: msg.style,
+        emphasize_numbers: _emphasizeNumbersChecked(pending.kind),
+      };
+      if (isSotong) {
+        bodyPayload.subject = msg.subject || pending.subject || "";
+        bodyPayload.prompt_template = SOTONG_PROMPT_TEMPLATE;
+        bodyPayload.transparent_background = false;
+      }
+      // 재생성 시 미리보기 컨텍스트에 subject 를 보존
+      msg.subject = bodyPayload.subject || null;
       try {
         const startResp = await fetch(HELPER_BASE + "/generate-image", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            texts: msg.texts || [],
-            width: msg.width,
-            height: msg.height,
-            kind: pending.kind,
-            extra_hint: pending.extraHint,
-            style: msg.style,
-            emphasize_numbers: _emphasizeNumbersChecked(pending.kind),
-          }),
+          body: JSON.stringify(bodyPayload),
         });
         if (!startResp.ok) {
           const txt = await startResp.text();

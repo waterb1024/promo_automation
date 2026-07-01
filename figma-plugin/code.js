@@ -1439,6 +1439,24 @@ figma.ui.onmessage = async function (msg) {
         message: "이미지 생성 준비 오류: " + (e && e.message ? e.message : String(e)),
       });
     }
+  } else if (msg.type === "sotong_prepare_selected") {
+    try {
+      prepareSotongImageFromSelection();
+    } catch (e) {
+      figma.ui.postMessage({
+        type: "image_generate_error",
+        message: "소통참여 준비 오류: " + (e && e.message ? e.message : String(e)),
+      });
+    }
+  } else if (msg.type === "sotong_prepare_new") {
+    try {
+      await prepareSotongImageFromSubject(msg);
+    } catch (e) {
+      figma.ui.postMessage({
+        type: "image_generate_error",
+        message: "소통참여 새 프레임 생성 오류: " + (e && e.message ? e.message : String(e)),
+      });
+    }
   } else if (msg.type === "image_generate_apply") {
     try {
       await applyGeneratedImage(msg);
@@ -1560,6 +1578,62 @@ figma.ui.onmessage = async function (msg) {
   }
 };
 
+// ── 소통참여 프레임명 파싱 ─────────────────────────────────────
+// 규칙: MMDD_image_소통참여_{주제}_top_984x552
+//   - 앞 3개: date, "image", "소통참여"
+//   - 뒤 2개: "top", size (예: 984x552)
+//   - 가운데는 모두 주제로 취급 (주제에 _ 포함 가능)
+function parseSotongFrameName(name) {
+  const parts = String(name || "").split("_");
+  if (parts.length < 6) return null;
+
+  const date = parts[0];
+  const type = parts[1];
+  const category = parts[2];
+  const suffix = parts[parts.length - 2];
+  const sizeToken = parts[parts.length - 1];
+
+  if (!/^\d{4}$/.test(date)) return null;
+  if (type !== "image") return null;
+  if (category !== "소통참여") return null;
+  if (suffix !== "top") return null;
+
+  const wh = sizeToken.split("x");
+  if (wh.length !== 2) return null;
+  if (!/^\d+$/.test(wh[0]) || !/^\d+$/.test(wh[1])) return null;
+  const width = parseInt(wh[0], 10);
+  const height = parseInt(wh[1], 10);
+
+  const subject = parts.slice(3, -2).join("_");
+  if (!subject) return null;
+
+  return { date, subject, width, height };
+}
+
+function _formatMMDD(d) {
+  const dt = d || new Date();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return mm + dd;
+}
+
+// UI 로 보낼 소통참여 선택 상태 (선택 프레임이 소통참여 규칙 매치 시)
+function _summarizeSotongSelection() {
+  const sel = figma.currentPage.selection || [];
+  if (sel.length !== 1) return null;
+  const n = sel[0];
+  if (n.type !== "FRAME" && n.type !== "INSTANCE" && n.type !== "COMPONENT") return null;
+  const parsed = parseSotongFrameName(n.name);
+  if (!parsed) return null;
+  return {
+    nodeId: n.id,
+    name: n.name,
+    subject: parsed.subject,
+    width: parsed.width,
+    height: parsed.height,
+  };
+}
+
 // ── selection 변경 → UI 에 알림 (일괄 처리 모드 토글용) ─────────────────
 function _summarizeSelection() {
   const sel = figma.currentPage.selection || [];
@@ -1577,9 +1651,87 @@ function _summarizeSelection() {
 }
 figma.on("selectionchange", function () {
   try {
-    figma.ui.postMessage({ type: "selection_changed", info: _summarizeSelection() });
+    figma.ui.postMessage({
+      type: "selection_changed",
+      info: _summarizeSelection(),
+      sotong: _summarizeSotongSelection(),
+    });
   } catch (e) { /* UI 가 닫혔을 수 있음 */ }
 });
+
+// ── 소통참여: 선택 프레임 컨텍스트 준비 (Mode A) ─────────────────
+function prepareSotongImageFromSelection() {
+  const info = _summarizeSotongSelection();
+  if (!info) {
+    figma.ui.postMessage({
+      type: "image_generate_error",
+      message: "MMDD_image_소통참여_{주제}_top_{w}x{h} 규칙에 맞는 프레임 1개를 선택해주세요.",
+    });
+    return;
+  }
+  figma.ui.postMessage({
+    type: "image_generate_context",
+    targetNodeId: info.nodeId,
+    frameNodeId: info.nodeId,   // 프레임 자체를 이미지 fill 대상으로 사용
+    targetName: info.name,
+    width: info.width,
+    height: info.height,
+    texts: [],                   // 소통참여는 텍스트 대신 주제를 프롬프트로 사용
+    kind: "sotong",
+    subject: info.subject,
+  });
+}
+
+// ── 소통참여: 새 프레임 만들기 + 컨텍스트 준비 (Mode B) ─────────────
+async function prepareSotongImageFromSubject(msg) {
+  const subject = msg && msg.subject ? String(msg.subject).trim() : "";
+  if (!subject) {
+    figma.ui.postMessage({
+      type: "image_generate_error",
+      message: "주제를 입력해주세요.",
+    });
+    return;
+  }
+  const width = 984;
+  const height = 552;
+  const safeSubject = subject.replace(/\s+/g, "_");
+  const name = _formatMMDD() + "_image_소통참여_" + safeSubject + "_top_" + width + "x" + height;
+
+  // 새 FRAME 생성 — 현재 페이지의 viewport center 근처
+  const frame = figma.createFrame();
+  frame.name = name;
+  frame.resize(width, height);
+  frame.fills = [{ type: "SOLID", color: { r: 0.94, g: 0.95, b: 0.97 } }];
+
+  // 위치: 현재 viewport 중앙, 그리고 선택된 프레임이 있으면 그 아래로
+  const sel = figma.currentPage.selection || [];
+  if (sel.length === 1 && (sel[0].type === "FRAME" || sel[0].type === "INSTANCE" || sel[0].type === "COMPONENT")) {
+    const anchor = sel[0];
+    frame.x = anchor.x;
+    frame.y = anchor.y + (anchor.height || 0) + 40;
+  } else {
+    const c = figma.viewport.center;
+    frame.x = Math.round(c.x - width / 2);
+    frame.y = Math.round(c.y - height / 2);
+  }
+
+  figma.currentPage.appendChild(frame);
+  figma.currentPage.selection = [frame];
+  figma.viewport.scrollAndZoomIntoView([frame]);
+
+  figma.ui.postMessage({
+    type: "image_generate_context",
+    targetNodeId: frame.id,
+    frameNodeId: frame.id,
+    targetName: frame.name,
+    width: width,
+    height: height,
+    texts: [],
+    kind: "sotong",
+    subject: subject,
+    createdNewFrame: true,
+  });
+}
 
 // ── 일괄 처리: UI 가 보낸 nodeId 1개를 선택 → popup_apply 흐름 시작 ──
 async function applyPopupBatchStep(msg) {
