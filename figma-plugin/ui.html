@@ -26,7 +26,7 @@
     border: 1px solid #d0d0d0; border-radius: 5px;
     font-family: "SF Mono", Menlo, Consolas, monospace; min-width: 0;
   }
-  input.jira-input:focus { outline: none; border-color: #18A0FB; }
+  input.jira-input:focus { outline: none; border-color: #6172DD; }
 
   /* 내 assignee 이슈 드롭다운 */
   .jira-row { position: relative; }
@@ -53,10 +53,10 @@
     font-size: 12px; line-height: 1.4;
   }
   .my-issue-item:last-child { border-bottom: none; }
-  .my-issue-item:hover { background: #eef7ff; }
+  .my-issue-item:hover { background: #eef0ff; }
   .my-issue-item .miikey {
     font-family: "SF Mono", Menlo, Consolas, monospace;
-    font-weight: 600; color: #18A0FB; margin-right: 6px;
+    font-weight: 600; color: #6172DD; margin-right: 6px;
   }
   .my-issue-item .miisum { color: #222; }
   .my-issue-item .miimeta {
@@ -80,7 +80,7 @@
     cursor: pointer; margin: 0; width: auto; border-radius: 0;
   }
   .tab-btn:hover { color: #333; }
-  .tab-btn.active { color: #18A0FB; border-bottom-color: #18A0FB; background: #fff; font-weight: 600; }
+  .tab-btn.active { color: #6172DD; border-bottom-color: #6172DD; background: #fff; font-weight: 600; }
 
   /* 서브 탭 */
   .sub-tab-bar { display: flex; gap: 4px; padding: 10px 14px 0; flex-shrink: 0; }
@@ -91,7 +91,7 @@
     cursor: pointer; margin: 0; width: auto; transition: all 0.12s;
   }
   .sub-tab-btn:hover { background: #e4e8f0; color: #333; }
-  .sub-tab-btn.active { background: #5e72e4; color: #fff; border-color: #5e72e4; font-weight: 600; }
+  .sub-tab-btn.active { background: #6172DD; color: #fff; border-color: #6172DD; font-weight: 600; }
 
   /* 탭 콘텐츠 */
   .tab-content { flex: 1; overflow-y: auto; padding: 12px 14px; display: none; }
@@ -108,7 +108,7 @@
     box-sizing: border-box;
   }
   input.text-input:focus, select.text-input:focus, textarea.text-input:focus {
-    outline: none; border-color: #18A0FB;
+    outline: none; border-color: #6172DD;
   }
 
   button {
@@ -116,7 +116,7 @@
     border: none; border-radius: 6px; cursor: pointer;
     margin-bottom: 6px; font-weight: 500; transition: background 0.12s;
   }
-  button.primary { background: #18A0FB; color: #fff; }
+  button.primary { background: #6172DD; color: #fff; }
   button.primary:hover:enabled { background: #0d8de0; }
   button.secondary { background: #f0f0f0; color: #333; }
   button.secondary:hover:enabled { background: #e4e4e4; }
@@ -132,7 +132,7 @@
 
   details.help { margin-bottom: 8px; }
   details.help summary {
-    cursor: pointer; font-size: 12px; color: #5e72e4;
+    cursor: pointer; font-size: 12px; color: #6172DD;
     font-weight: 500; list-style: none; user-select: none;
   }
   details.help summary::-webkit-details-marker { display: none; }
@@ -141,7 +141,7 @@
   details.help .hint { font-size: 12px; color: #6a7689; line-height: 1.5; margin: 5px 0 0; }
 
   button.btn-reg {
-    background: #fff; color: #5e72e4; border: 1px solid #c5d2e5;
+    background: #fff; color: #6172DD; border: 1px solid #c5d2e5;
     font-size: 12px; padding: 6px 8px; font-weight: 400;
   }
   button.btn-reg:hover:enabled { background: #f0f4fb; }
@@ -150,7 +150,7 @@
     font-size: 12px; padding: 6px 8px; font-weight: 400;
   }
   button.btn-del:hover:enabled { background: #fff5f5; }
-  button.btn-apply { background: #5e72e4; color: #fff; }
+  button.btn-apply { background: #6172DD; color: #fff; }
   button.btn-apply:hover:enabled { background: #4255cc; }
 
   /* 이미지 생성 진행 상태 박스 */
@@ -164,7 +164,7 @@
   .img-gen-status .stage { font-weight: 600; }
   .img-gen-status .timer {
     float: right; font-family: "SF Mono", Menlo, Consolas, monospace;
-    color: #5e72e4; font-weight: 600;
+    color: #6172DD; font-weight: 600;
   }
   .img-gen-status .substep {
     font-size: 12px; color: #6a7689; margin-top: 2px;
@@ -175,7 +175,7 @@
   }
   .img-gen-status .bar::after {
     content: ""; position: absolute; left: -40%; top: 0;
-    width: 40%; height: 100%; background: #5e72e4;
+    width: 40%; height: 100%; background: #6172DD;
     animation: imgGenSlide 1.4s linear infinite;
   }
   @keyframes imgGenSlide {
@@ -280,10 +280,10 @@
     flex: 1; padding: 6px 9px; font-size: 12px;
     border: 1px solid #d0d0d0; border-radius: 5px; min-width: 0;
   }
-  .promo-lib-search-row input:focus { outline: none; border-color: #18A0FB; }
+  .promo-lib-search-row input:focus { outline: none; border-color: #6172DD; }
   .promo-lib-search-row button {
     padding: 6px 10px; font-size: 12px; margin: 0;
-    background: #5e72e4; color: #fff; border: none; border-radius: 5px;
+    background: #6172DD; color: #fff; border: none; border-radius: 5px;
     width: auto; cursor: pointer;
   }
   .promo-lib-filters { display: flex; gap: 4px; }
@@ -293,7 +293,7 @@
     border-radius: 14px; cursor: pointer;
   }
   .promo-lib-filters button.active {
-    background: #5e72e4; color: #fff; border-color: #5e72e4; font-weight: 600;
+    background: #6172DD; color: #fff; border-color: #6172DD; font-weight: 600;
   }
   .promo-lib-body {
     max-height: 240px; overflow-y: auto; padding: 8px 10px;
@@ -311,7 +311,7 @@
     padding: 4px; transition: border-color 0.1s;
   }
   .promo-lib-item:hover { border-color: #c0d0f0; }
-  .promo-lib-item.selected { border-color: #18A0FB; background: #eef7ff; }
+  .promo-lib-item.selected { border-color: #6172DD; background: #eef0ff; }
   .promo-lib-item img {
     width: 100%; aspect-ratio: 1;
     object-fit: contain; background: #fff; display: block;
@@ -337,7 +337,7 @@
     border: none; border-radius: 5px; cursor: pointer;
   }
   .promo-lib-foot .plib-apply {
-    background: #18A0FB; color: #fff; font-weight: 600;
+    background: #6172DD; color: #fff; font-weight: 600;
   }
   .promo-lib-foot .plib-apply:disabled {
     background: #b8d5ee; cursor: not-allowed;
