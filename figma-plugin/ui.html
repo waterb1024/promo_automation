@@ -213,9 +213,128 @@
     text-decoration: underline; width: auto; margin: 0;
   }
   button.close-link:hover:enabled { color: #666; }
+
+  /* PLATFORM-8 라이브러리 매칭 이미지 선택 — 인라인 카드 (팝업/배너 탭 안) */
+  .promo-lib-overlay {
+    display: none; margin-top: 8px;
+  }
+  .promo-lib-overlay.active { display: block; }
+  .promo-lib-card {
+    background: #fff;
+    border: 1px solid #c9d6f3; border-radius: 8px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .promo-lib-head {
+    padding: 10px 12px 8px; border-bottom: 1px solid #e8ecf2;
+    flex-shrink: 0;
+  }
+  .promo-lib-title {
+    font-size: 12px; font-weight: 700; color: #1a1a2e; margin: 0 0 6px;
+  }
+  .promo-lib-subtitle {
+    font-size: 10px; color: #6a7689; margin: 0 0 8px;
+  }
+  .promo-lib-search-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .promo-lib-search-row input {
+    flex: 1; padding: 6px 9px; font-size: 12px;
+    border: 1px solid #d0d0d0; border-radius: 5px; min-width: 0;
+  }
+  .promo-lib-search-row input:focus { outline: none; border-color: #18A0FB; }
+  .promo-lib-search-row button {
+    padding: 6px 10px; font-size: 11px; margin: 0;
+    background: #5e72e4; color: #fff; border: none; border-radius: 5px;
+    width: auto; cursor: pointer;
+  }
+  .promo-lib-filters { display: flex; gap: 4px; }
+  .promo-lib-filters button {
+    padding: 4px 10px; font-size: 10.5px; margin: 0; width: auto;
+    background: #f0f2f5; color: #666; border: 1px solid #dde2ec;
+    border-radius: 14px; cursor: pointer;
+  }
+  .promo-lib-filters button.active {
+    background: #5e72e4; color: #fff; border-color: #5e72e4; font-weight: 600;
+  }
+  .promo-lib-body {
+    max-height: 240px; overflow-y: auto; padding: 8px 10px;
+    background: #fafbfc;
+  }
+  .promo-lib-status {
+    font-size: 11px; color: #6a7689; text-align: center; padding: 20px 0;
+  }
+  .promo-lib-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  }
+  .promo-lib-item {
+    position: relative; background: #fff; border: 2px solid transparent;
+    border-radius: 6px; cursor: pointer; overflow: hidden;
+    padding: 4px; transition: border-color 0.1s;
+  }
+  .promo-lib-item:hover { border-color: #c0d0f0; }
+  .promo-lib-item.selected { border-color: #18A0FB; background: #eef7ff; }
+  .promo-lib-item img {
+    width: 100%; aspect-ratio: 1;
+    object-fit: contain; background: #fff; display: block;
+  }
+  .promo-lib-item .plibel { font-size: 9.5px; color: #333; margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .promo-lib-item .plisub { font-size: 8.5px; color: #888; margin-top: 1px; }
+  .promo-lib-item .pliview {
+    position: absolute; top: 4px; left: 4px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    font-size: 8.5px; padding: 1px 4px; border-radius: 3px;
+  }
+  .promo-lib-item .plifav {
+    position: absolute; top: 4px; right: 4px;
+    font-size: 11px; color: #ffb400;
+  }
+  .promo-lib-foot {
+    padding: 8px 12px; border-top: 1px solid #e8ecf2;
+    display: flex; gap: 6px; flex-shrink: 0; background: #fff;
+  }
+  .promo-lib-foot button {
+    flex: 1; margin: 0; padding: 7px 4px; font-size: 11px;
+    border: none; border-radius: 5px; cursor: pointer;
+  }
+  .promo-lib-foot .plib-apply {
+    background: #18A0FB; color: #fff; font-weight: 600;
+  }
+  .promo-lib-foot .plib-apply:disabled {
+    background: #b8d5ee; cursor: not-allowed;
+  }
+  .promo-lib-foot .plib-fallback { background: #f0f2f5; color: #333; }
+  .promo-lib-foot .plib-cancel { background: #fff; color: #999; border: 1px solid #dcdfe5; }
 </style>
 </head>
 <body>
+
+  <!-- PLATFORM-8 라이브러리 매칭 이미지 선택 모달 -->
+  <!-- PLATFORM-8 라이브러리 매칭 인라인 카드 (open 시 팝업/배너 탭 안으로 이동됨) -->
+  <div class="promo-lib-overlay" id="promo-lib-overlay">
+    <div class="promo-lib-card">
+      <div class="promo-lib-head">
+        <div class="promo-lib-title">PLATFORM-8 라이브러리 매칭</div>
+        <div class="promo-lib-subtitle" id="promo-lib-subtitle">썸네일을 클릭하면 바로 적용됩니다.</div>
+        <div class="promo-lib-search-row">
+          <input type="text" id="promo-lib-query" placeholder="검색어 (예: 여행 가방)" />
+          <button id="promo-lib-search-btn">검색</button>
+        </div>
+        <div class="promo-lib-filters">
+          <button data-plib-view="any" class="active">전체</button>
+          <button data-plib-view="3d">3D</button>
+          <button data-plib-view="2d">2D</button>
+        </div>
+      </div>
+      <div class="promo-lib-body">
+        <div class="promo-lib-status" id="promo-lib-status">검색 중…</div>
+        <div class="promo-lib-grid" id="promo-lib-grid" style="display:none;"></div>
+      </div>
+      <div class="promo-lib-foot">
+        <button class="plib-cancel" id="promo-lib-cancel">취소</button>
+        <button class="plib-fallback" id="promo-lib-fallback">AI 로 새로 생성</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 상단 고정 -->
   <div class="top-area">
@@ -283,8 +402,6 @@
             <option value="photoreal">실사 사진</option>
             <option value="illustration">2D 일러스트</option>
           </select>
-          <label class="lbl">AI 이미지 스타일 힌트 (선택)</label>
-          <input class="text-input" id="banner-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:6px;" />
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10.5px;color:#444;">
             <input type="checkbox" id="banner-emphasize-numbers" style="width:auto;margin:0;" />
             <label for="banner-emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자 강조 (예: 20000, 5%)</label>
@@ -335,8 +452,6 @@
             <option value="photoreal">실사 사진</option>
             <option value="illustration">2D 일러스트</option>
           </select>
-          <label class="lbl">AI 이미지 스타일 힌트 (선택)</label>
-          <input class="text-input" id="popup-img-hint" placeholder="예: 따뜻한 톤, 깔끔한 배경" style="margin-bottom:6px;" />
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10.5px;color:#444;">
             <input type="checkbox" id="popup-emphasize-numbers" style="width:auto;margin:0;" />
             <label for="popup-emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자 강조 (예: 20000, 5%)</label>
@@ -756,6 +871,148 @@
     if (box) box.classList.remove("active");
     _imgPreviewState = null;
   }
+
+  // ── PLATFORM-8 라이브러리 매칭 이미지 선택 모달 ──
+  // 팝업/배너 이미지 생성 시 사내 이미지 라이브러리(10.10.224.110:3000) 를 먼저 조회.
+  // 매칭 있으면 이 모달을 띄우고 [선택 이미지 적용] / [AI 로 새로 생성] / [취소] 중 하나를 대기.
+  let _promoLibState = null;
+
+  function _plibEscape(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // 프레임명 → promotion 키워드 추출 (팝업/배너만 대상, 소통참여는 미대상)
+  //   MMDD_popup_{promotion}_{w}x{h} → "{promotion}" (언더스코어는 공백으로)
+  function _plibExtractPromotion(frameName) {
+    if (!frameName) return "";
+    const parts = String(frameName).split("_");
+    if (parts.length < 4) return "";
+    const type = (parts[1] || "").toLowerCase();
+    if (type !== "popup" && type !== "banner") return "";
+    return parts.slice(2, -1).join(" ").trim();
+  }
+
+  function _plibResetViewButtons(view) {
+    document.querySelectorAll(".promo-lib-filters button").forEach(b => {
+      b.classList.toggle("active", b.dataset.plibView === view);
+    });
+  }
+
+  async function _plibRunSearch() {
+    const s = _promoLibState;
+    if (!s) return;
+    const grid = document.getElementById("promo-lib-grid");
+    const status = document.getElementById("promo-lib-status");
+    grid.style.display = "none";
+    grid.innerHTML = "";
+    status.style.display = "block";
+    status.textContent = "검색 중…";
+    s.items = [];
+    try {
+      const url = HELPER_BASE + "/promo-images/search?q=" +
+        encodeURIComponent(s.query) + "&view=" + encodeURIComponent(s.view);
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      s.items = data.items || [];
+      if (s.items.length === 0) {
+        status.textContent = "매칭 결과 없음 — [AI 로 새로 생성] 을 눌러주세요.";
+        return;
+      }
+      status.style.display = "none";
+      grid.style.display = "grid";
+      grid.innerHTML = s.items.map((it, idx) => {
+        const view = (it.view || "").toUpperCase();
+        const fav = it.favorite ? '<span class="plifav">★</span>' : '';
+        const thumbSrc = HELPER_BASE + "/promo-images/thumbnail?u=" + encodeURIComponent(it.image_url);
+        return '<div class="promo-lib-item" data-idx="' + idx + '" title="클릭하면 바로 적용됩니다">' +
+          '<img src="' + _plibEscape(thumbSrc) + '" alt="" loading="lazy" />' +
+          (view ? '<span class="pliview">' + _plibEscape(view) + '</span>' : '') +
+          fav +
+          '<div class="plibel">' + _plibEscape(it.subject || "") + '</div>' +
+          '<div class="plisub">' + _plibEscape(it.opts || "") + '</div>' +
+          '</div>';
+      }).join("");
+      grid.querySelectorAll(".promo-lib-item").forEach(el => {
+        el.addEventListener("click", () => _plibPickAndApply(parseInt(el.dataset.idx, 10)));
+      });
+    } catch (e) {
+      status.textContent = "검색 실패: " + (e && e.message ? e.message : e);
+    }
+  }
+
+  // 썸네일 클릭 = 즉시 선택 + 적용 (별도 [적용] 버튼 없음)
+  function _plibPickAndApply(idx) {
+    const s = _promoLibState;
+    if (!s || !s.items[idx]) return;
+    // 시각 피드백 — 잠깐 하이라이트
+    document.querySelectorAll(".promo-lib-item").forEach(el => {
+      el.classList.toggle("selected", parseInt(el.dataset.idx, 10) === idx);
+    });
+    _plibClose({ kind: "applied", item: s.items[idx] });
+  }
+
+  function _plibClose(decision) {
+    const s = _promoLibState;
+    if (!s) return;
+    const el = document.getElementById("promo-lib-overlay");
+    el.classList.remove("active");
+    const r = s.resolve;
+    _promoLibState = null;
+    r(decision);
+  }
+
+  // 픽커 오픈 — kind 로 지정된 탭 안으로 element 를 이동해서 표시.
+  // initialView: "any" | "2d" | "3d" — AI 스타일 dropdown 에 맞춰 필터 초기값 지정
+  // Promise 반환: { kind: "applied", item } | { kind: "fallback" } | { kind: "cancel" }
+  function _openPromoLibPicker(kind, initialQuery, subtitle, initialView) {
+    return new Promise((resolve) => {
+      const view = (initialView === "2d" || initialView === "3d") ? initialView : "any";
+      _promoLibState = {
+        kind: kind,
+        query: initialQuery || "",
+        view: view,
+        items: [],
+        resolve: resolve,
+      };
+      const el = document.getElementById("promo-lib-overlay");
+      const tabId = kind === "banner" ? "sub-banner" : "sub-popup";
+      const tab = document.getElementById(tabId);
+      if (tab && el.parentNode !== tab) tab.appendChild(el);   // 해당 탭 안으로 relocate
+      document.getElementById("promo-lib-query").value = _promoLibState.query;
+      _plibResetViewButtons(view);
+      const sub = document.getElementById("promo-lib-subtitle");
+      if (sub) sub.textContent = subtitle || "썸네일을 클릭하면 바로 적용됩니다.";
+      el.classList.add("active");
+      // 픽커가 잘 보이도록 스크롤
+      setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {} }, 30);
+      _plibRunSearch();
+    });
+  }
+
+  // 픽커 이벤트 wiring
+  document.getElementById("promo-lib-search-btn").addEventListener("click", () => {
+    const s = _promoLibState;
+    if (!s) return;
+    s.query = document.getElementById("promo-lib-query").value.trim();
+    _plibRunSearch();
+  });
+  document.getElementById("promo-lib-query").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("promo-lib-search-btn").click(); }
+  });
+  document.querySelectorAll(".promo-lib-filters button").forEach(b => {
+    b.addEventListener("click", () => {
+      const s = _promoLibState;
+      if (!s) return;
+      s.view = b.dataset.plibView;
+      _plibResetViewButtons(s.view);
+      _plibRunSearch();
+    });
+  });
+  document.getElementById("promo-lib-cancel").addEventListener("click", () => _plibClose({ kind: "cancel" }));
+  document.getElementById("promo-lib-fallback").addEventListener("click", () => _plibClose({ kind: "fallback" }));
 
   const DS_TYPE_LABEL = {
     "main-image": "메인 이미지", "coupon": "쿠폰", "text": "텍스트",
@@ -1343,11 +1600,92 @@
       // code.js 가 보낸 컨텍스트 → Helper /generate-image 비동기 job 시작 → polling
       const pending = _imageGenPending || { kind: "popup", extraHint: null, style: "3d" };
       if (!_imgGenActiveKind) _imgGenStart(pending.kind);
-      _imgGenSetStage("이미지 생성 중…", "GPT 프롬프트 작성");
       // msg 에 style/extraHint 를 같이 넣어 보내서 미리보기 재생성 시 ctx 로 활용
       msg.style = pending.style || "3d";
       msg.extraHint = pending.extraHint || null;
       log("  대상: " + msg.targetName + " (" + msg.width + "×" + msg.height + ")", "info");
+
+      // ─ PLATFORM-8 라이브러리 우선 시도 (팝업/배너만, 소통참여 제외) ─
+      const _plibKindOk = (pending.kind === "popup" || pending.kind === "banner");
+      // 검색어: 프레임명의 promotion + 프레임 내 텍스트 노드 전부
+      const _plibFrameName = msg.frameName || msg.targetName || "";
+      const _plibPromotion = _plibKindOk ? _plibExtractPromotion(_plibFrameName) : "";
+      const _plibTextTokens = (msg.texts || [])
+        .map(t => String(t || "").trim())
+        .filter(Boolean);
+      const _plibQuery = [_plibPromotion, ..._plibTextTokens]
+        .filter(Boolean).join(" ").trim();
+      // AI 스타일 dropdown 값을 라이브러리 view 필터로 매핑: 3d→3d, illustration→2d, photoreal/기타→any
+      const _plibInitialView =
+        pending.style === "3d" ? "3d" :
+        pending.style === "illustration" ? "2d" : "any";
+      let _plibHandled = false;
+      if (_plibKindOk && _plibQuery) {
+        _imgGenSetStage("PLATFORM-8 라이브러리 검색 중…", _plibQuery.slice(0, 40));
+        let _plibItems = [];
+        try {
+          const r = await fetch(HELPER_BASE + "/promo-images/search?q=" + encodeURIComponent(_plibQuery) +
+            "&view=" + encodeURIComponent(_plibInitialView));
+          if (r.ok) {
+            const d = await r.json();
+            _plibItems = d.items || [];
+          }
+        } catch (e) {
+          log("  ⚠ PLATFORM-8 검색 실패 — AI 생성으로 진행: " + (e.message || e), "warn");
+        }
+        if (_plibItems.length > 0) {
+          log("  · PLATFORM-8 매칭 " + _plibItems.length + "개 발견 (검색어: " + _plibQuery + ", view=" + _plibInitialView + ")", "muted");
+          _imgGenStop();
+          const decision = await _openPromoLibPicker(
+            pending.kind,
+            _plibQuery,
+            '프레임 "' + _plibFrameName + '" + 본문 텍스트로 검색. 썸네일 클릭 시 바로 적용됩니다.',
+            _plibInitialView
+          );
+          if (decision.kind === "cancel") {
+            log("  · PLATFORM-8 선택 취소 — 이미지 생성 중단", "muted");
+            setBusy(false); _imageGenPending = null;
+            return;
+          }
+          if (decision.kind === "applied") {
+            _imgGenStart(pending.kind);
+            _imgGenSetStage("PLATFORM-8 이미지 다운로드 중…", decision.item.subject || "");
+            try {
+              const dlResp = await fetch(HELPER_BASE + "/promo-images/download?u=" + encodeURIComponent(decision.item.image_url));
+              if (!dlResp.ok) throw new Error("HTTP " + dlResp.status);
+              const dl = await dlResp.json();
+              log("  ✓ PLATFORM-8 이미지 받음 (" + dl.size + " bytes, " + (decision.item.subject || "") + ")" +
+                  (dl.background_removed ? " · 흰 배경 투명 처리됨" : "") +
+                  (dl.background_color ? " · pastel=" + dl.background_color : ""), "ok");
+              // 미리보기 UI 건너뛰고 바로 프레임 fill — 사용자가 이미 썸네일로 확인함
+              _imgGenSetStage("Figma 에 적용 중…", "이미지 fill + 프레임 배경 pastel");
+              parent.postMessage({
+                pluginMessage: {
+                  type: "image_generate_apply",
+                  targetNodeId: msg.targetNodeId,
+                  frameNodeId: msg.frameNodeId,        // 프레임 배경에 pastel 적용
+                  backgroundColor: dl.background_color || null,
+                  base64: dl.base64,
+                  prompt: "[PLATFORM-8] " + (decision.item.subject || "") +
+                          (decision.item.view ? " · " + decision.item.view : "") +
+                          (decision.item.opts ? " · " + decision.item.opts : ""),
+                },
+              }, "*");
+              _plibHandled = true;
+              // busy / _imgGenStop 은 image_generate_done 수신 시 처리됨 (기존 흐름 재사용)
+            } catch (e) {
+              log("✗ PLATFORM-8 이미지 다운로드 실패 — AI 생성으로 폴백: " + (e && e.message ? e.message : e), "warn");
+            }
+          }
+          // decision.kind === "fallback" 또는 다운로드 실패: 아래 AI 생성 흐름으로 계속
+          if (!_plibHandled) _imgGenStart(pending.kind);
+        } else {
+          log("  · PLATFORM-8 매칭 없음 — AI 생성으로 진행", "muted");
+        }
+      }
+      if (_plibHandled) return;
+
+      _imgGenSetStage("이미지 생성 중…", "GPT 프롬프트 작성");
       log("  텍스트 " + (msg.texts ? msg.texts.length : 0) + "개, style=" + msg.style + " → GPT 프롬프트 + gpt-image-1 호출...", "muted");
       // 소통참여: 고정 프롬프트 템플릿 + 사용자 지정 주제. 프레임에는 이미지 fill 만 적용.
       const isSotong = pending.kind === "sotong";

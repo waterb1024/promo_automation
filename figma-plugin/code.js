@@ -1213,6 +1213,7 @@ function prepareImageGenerate(opts) {
     targetNodeId: target.id,
     frameNodeId: root.id,
     targetName: target.name || "(이름 없음)",
+    frameName: root.name || "(이름 없음)",
     width: Math.max(64, Math.round(target.width)),
     height: Math.max(64, Math.round(target.height)),
     texts: texts,
@@ -1550,6 +1551,15 @@ figma.ui.onmessage = async function (msg) {
       // 실패해도 fatal 아님 — UI 는 default 값으로 진행
       figma.ui.postMessage({ type: "ui_settings_loaded", settings: {} });
     }
+    // 초기 selection 스냅샷 전달 — selectionchange 는 "변경 시"만 발화하므로
+    // 플러그인 시작 시 이미 선택돼 있던 프레임(특히 소통참여 규칙 매치)이 UI 에 반영되지 않는 문제 해결
+    try {
+      figma.ui.postMessage({
+        type: "selection_changed",
+        info: _summarizeSelection(),
+        sotong: _summarizeSotongSelection(),
+      });
+    } catch (e) { /* UI 준비 전이면 무시 */ }
   } else if (msg.type === "ui_setting_save") {
     // 단일 설정값 저장 (key, value)
     try {
