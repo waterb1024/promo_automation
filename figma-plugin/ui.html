@@ -27,6 +27,45 @@
   }
   input.jira-input:focus { outline: none; border-color: #18A0FB; }
 
+  /* 내 assignee 이슈 드롭다운 */
+  .jira-row { position: relative; }
+  .my-issues-btn {
+    padding: 6px 8px; font-size: 10.5px; margin: 0; width: auto;
+    background: #f0f2f5; color: #333; border: 1px solid #d0d0d0;
+    border-radius: 5px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .my-issues-btn:hover:enabled { background: #e4e8f0; }
+  .my-issues-btn:disabled { opacity: 0.5; cursor: default; }
+  .my-issues-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid #d0d0d0; border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    max-height: 320px; overflow-y: auto; z-index: 500;
+    display: none;
+  }
+  .my-issues-dropdown.active { display: block; }
+  .my-issues-status {
+    padding: 10px 12px; font-size: 11px; color: #6a7689; text-align: center;
+  }
+  .my-issue-item {
+    padding: 7px 10px; cursor: pointer; border-bottom: 1px solid #f0f2f5;
+    font-size: 11px; line-height: 1.4;
+  }
+  .my-issue-item:last-child { border-bottom: none; }
+  .my-issue-item:hover { background: #eef7ff; }
+  .my-issue-item .miikey {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 600; color: #18A0FB; margin-right: 6px;
+  }
+  .my-issue-item .miisum { color: #222; }
+  .my-issue-item .miimeta {
+    font-size: 9.5px; color: #6a7689; margin-top: 2px;
+  }
+  .miistatus {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    background: #f0f2f5; font-weight: 500; margin-right: 5px;
+  }
+
   /* 메인 탭 */
   .tab-bar {
     display: flex; background: #f4f5f7;
@@ -342,6 +381,10 @@
     <div class="jira-row">
       <span class="jira-label">Way 이슈 키</span>
       <input id="jira" class="jira-input" type="text" placeholder="예: KONASALES-1234" autocomplete="off" />
+      <button id="my-issues-btn" class="my-issues-btn" type="button" title="내 assignee 이슈 리스트">내 이슈 ▾</button>
+      <div id="my-issues-dropdown" class="my-issues-dropdown">
+        <div class="my-issues-status" id="my-issues-status">불러오는 중…</div>
+      </div>
     </div>
   </div>
 
@@ -694,6 +737,82 @@
   try { const s = sessionStorage.getItem("promo_jira_key"); if (s) jiraInput.value = s; } catch (e) {}
   jiraInput.addEventListener("input", () => {
     try { sessionStorage.setItem("promo_jira_key", jiraInput.value.trim()); } catch (e) {}
+  });
+
+  // ── 내 assignee 이슈 드롭다운 ──
+  const myIssuesBtn = document.getElementById("my-issues-btn");
+  const myIssuesDrop = document.getElementById("my-issues-dropdown");
+  const myIssuesStatus = document.getElementById("my-issues-status");
+  let _myIssuesLoaded = false;
+
+  function _fmtIssueUpdated(iso) {
+    if (!iso) return "";
+    // "2026-07-02T13:30:32.000+0900" → "07-02 13:30"
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : String(iso);
+  }
+  function _escapeHtmlMi(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  async function _loadMyIssues() {
+    myIssuesStatus.textContent = "불러오는 중…";
+    myIssuesDrop.querySelectorAll(".my-issue-item").forEach(e => e.remove());
+    myIssuesStatus.style.display = "block";
+    try {
+      const resp = await fetch(HELPER_BASE + "/issue/my-assigned?max_results=30");
+      if (!resp.ok) {
+        const t = await resp.text();
+        throw new Error("HTTP " + resp.status + ": " + t.slice(0, 200));
+      }
+      const data = await resp.json();
+      const issues = data.issues || [];
+      if (issues.length === 0) {
+        myIssuesStatus.textContent = "assignee 로 지정된 미해결 이슈가 없습니다.";
+        return;
+      }
+      myIssuesStatus.style.display = "none";
+      const frag = document.createDocumentFragment();
+      for (const it of issues) {
+        const el = document.createElement("div");
+        el.className = "my-issue-item";
+        el.innerHTML =
+          '<div><span class="miikey">' + _escapeHtmlMi(it.key) + '</span>' +
+          '<span class="miisum">' + _escapeHtmlMi(it.summary || "") + '</span></div>' +
+          '<div class="miimeta">' +
+          '<span class="miistatus">' + _escapeHtmlMi(it.status || "") + '</span>' +
+          _escapeHtmlMi(it.issuetype || "") +
+          (it.updated ? ' · ' + _fmtIssueUpdated(it.updated) : '') +
+          '</div>';
+        el.addEventListener("click", () => {
+          jiraInput.value = it.key;
+          try { sessionStorage.setItem("promo_jira_key", it.key); } catch (e) {}
+          _closeMyIssuesDrop();
+          jiraInput.focus();
+        });
+        frag.appendChild(el);
+      }
+      myIssuesDrop.appendChild(frag);
+      _myIssuesLoaded = true;
+    } catch (e) {
+      myIssuesStatus.textContent = "불러오기 실패: " + (e && e.message ? e.message : e);
+    }
+  }
+  function _openMyIssuesDrop() {
+    myIssuesDrop.classList.add("active");
+    if (!_myIssuesLoaded) _loadMyIssues();
+  }
+  function _closeMyIssuesDrop() {
+    myIssuesDrop.classList.remove("active");
+  }
+  myIssuesBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (myIssuesDrop.classList.contains("active")) _closeMyIssuesDrop();
+    else _openMyIssuesDrop();
+  });
+  document.addEventListener("click", (e) => {
+    if (!myIssuesDrop.contains(e.target) && e.target !== myIssuesBtn) _closeMyIssuesDrop();
   });
 
   function log(msg, cls) {
