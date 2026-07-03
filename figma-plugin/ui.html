@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
     margin: 0; padding: 0;
     color: #222; background: #fff;
     display: flex; flex-direction: column;
@@ -19,7 +20,7 @@
   }
   .top-title { font-size: 12px; font-weight: 700; color: #1a1a2e; margin: 0 0 8px; }
   .jira-row { display: flex; gap: 6px; align-items: center; }
-  .jira-label { font-size: 10px; color: #666; white-space: nowrap; flex-shrink: 0; }
+  .jira-label { font-size: 12px; color: #666; white-space: nowrap; flex-shrink: 0; }
   input.jira-input {
     flex: 1; padding: 6px 9px; font-size: 12px;
     border: 1px solid #d0d0d0; border-radius: 5px;
@@ -30,7 +31,7 @@
   /* 내 assignee 이슈 드롭다운 */
   .jira-row { position: relative; }
   .my-issues-btn {
-    padding: 6px 8px; font-size: 10.5px; margin: 0; width: auto;
+    padding: 6px 8px; font-size: 12px; margin: 0; width: auto;
     background: #f0f2f5; color: #333; border: 1px solid #d0d0d0;
     border-radius: 5px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
@@ -45,11 +46,11 @@
   }
   .my-issues-dropdown.active { display: block; }
   .my-issues-status {
-    padding: 10px 12px; font-size: 11px; color: #6a7689; text-align: center;
+    padding: 10px 12px; font-size: 12px; color: #6a7689; text-align: center;
   }
   .my-issue-item {
     padding: 7px 10px; cursor: pointer; border-bottom: 1px solid #f0f2f5;
-    font-size: 11px; line-height: 1.4;
+    font-size: 12px; line-height: 1.4;
   }
   .my-issue-item:last-child { border-bottom: none; }
   .my-issue-item:hover { background: #eef7ff; }
@@ -59,7 +60,7 @@
   }
   .my-issue-item .miisum { color: #222; }
   .my-issue-item .miimeta {
-    font-size: 9.5px; color: #6a7689; margin-top: 2px;
+    font-size: 12px; color: #6a7689; margin-top: 2px;
   }
   .miistatus {
     display: inline-block; padding: 1px 6px; border-radius: 8px;
@@ -73,7 +74,7 @@
   }
   .tab-btn {
     flex: 1; padding: 8px 4px;
-    font-size: 11px; font-weight: 500; color: #666;
+    font-size: 12px; font-weight: 500; color: #666;
     background: transparent; border: none;
     border-bottom: 2px solid transparent;
     cursor: pointer; margin: 0; width: auto; border-radius: 0;
@@ -84,7 +85,7 @@
   /* 서브 탭 */
   .sub-tab-bar { display: flex; gap: 4px; padding: 10px 14px 0; flex-shrink: 0; }
   .sub-tab-btn {
-    padding: 5px 12px; font-size: 11px; font-weight: 500;
+    padding: 5px 12px; font-size: 12px; font-weight: 500;
     color: #666; background: #f0f2f5;
     border: 1px solid #dde2ec; border-radius: 20px;
     cursor: pointer; margin: 0; width: auto; transition: all 0.12s;
@@ -99,7 +100,7 @@
   .sub-tab-content.active { display: block; }
 
   /* 공통 */
-  label.lbl { display: block; font-size: 10.5px; color: #555; margin-bottom: 3px; }
+  label.lbl { display: block; font-size: 12px; color: #555; margin-bottom: 3px; }
   input.text-input, select.text-input, textarea.text-input {
     width: 100%; padding: 7px 9px; font-size: 12px;
     border: 1px solid #d0d0d0; border-radius: 5px;
@@ -127,26 +128,26 @@
     background: #f8faff; border: 1px solid #dbe5f2;
     border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
   }
-  .card-title { font-size: 11px; font-weight: 600; color: #2c5aa0; margin: 0 0 8px; }
+  .card-title { font-size: 12px; font-weight: 600; color: #2c5aa0; margin: 0 0 8px; }
 
   details.help { margin-bottom: 8px; }
   details.help summary {
-    cursor: pointer; font-size: 10.5px; color: #5e72e4;
+    cursor: pointer; font-size: 12px; color: #5e72e4;
     font-weight: 500; list-style: none; user-select: none;
   }
   details.help summary::-webkit-details-marker { display: none; }
   details.help summary::after { content: " ›"; font-size: 13px; display: inline-block; transition: transform 0.12s; }
   details.help[open] summary::after { transform: rotate(90deg); }
-  details.help .hint { font-size: 10.5px; color: #6a7689; line-height: 1.5; margin: 5px 0 0; }
+  details.help .hint { font-size: 12px; color: #6a7689; line-height: 1.5; margin: 5px 0 0; }
 
   button.btn-reg {
     background: #fff; color: #5e72e4; border: 1px solid #c5d2e5;
-    font-size: 11px; padding: 6px 8px; font-weight: 400;
+    font-size: 12px; padding: 6px 8px; font-weight: 400;
   }
   button.btn-reg:hover:enabled { background: #f0f4fb; }
   button.btn-del {
     background: #fff; color: #c53030; border: 1px solid #f5d0d0;
-    font-size: 11px; padding: 6px 8px; font-weight: 400;
+    font-size: 12px; padding: 6px 8px; font-weight: 400;
   }
   button.btn-del:hover:enabled { background: #fff5f5; }
   button.btn-apply { background: #5e72e4; color: #fff; }
@@ -156,7 +157,7 @@
   .img-gen-status {
     margin-top: 6px; padding: 8px 10px;
     background: #eef3ff; border: 1px solid #c9d6f3;
-    border-radius: 6px; font-size: 10.5px; color: #2c3e80;
+    border-radius: 6px; font-size: 12px; color: #2c3e80;
     display: none; line-height: 1.5;
   }
   .img-gen-status.active { display: block; }
@@ -166,7 +167,7 @@
     color: #5e72e4; font-weight: 600;
   }
   .img-gen-status .substep {
-    font-size: 10px; color: #6a7689; margin-top: 2px;
+    font-size: 12px; color: #6a7689; margin-top: 2px;
   }
   .img-gen-status .bar {
     margin-top: 6px; height: 4px; background: #d9e3f7;
@@ -189,7 +190,7 @@
   }
   .img-preview.active { display: block; }
   .img-preview-title {
-    font-size: 11px; font-weight: 600; color: #2c3e80;
+    font-size: 12px; font-weight: 600; color: #2c3e80;
     margin-bottom: 6px;
   }
   .img-preview-thumb {
@@ -199,25 +200,25 @@
   }
   .img-preview-meta {
     display: flex; gap: 6px; align-items: center;
-    margin-top: 6px; font-size: 10.5px; color: #555;
+    margin-top: 6px; font-size: 12px; color: #555;
   }
   .bg-swatch {
     display: inline-block; width: 16px; height: 16px;
     border-radius: 3px; border: 1px solid #d0d4dc; flex-shrink: 0;
   }
   .img-preview-prompt {
-    margin-top: 5px; font-size: 10px; color: #6a7689;
+    margin-top: 5px; font-size: 12px; color: #6a7689;
     line-height: 1.4; max-height: 60px; overflow-y: auto;
     padding: 4px 6px; background: #f7f8fb; border-radius: 4px;
   }
   .img-preview-actions {
     display: flex; gap: 4px; margin-top: 8px;
   }
-  .img-preview-actions button { flex: 1; margin: 0; padding: 7px 4px; font-size: 11px; }
+  .img-preview-actions button { flex: 1; margin: 0; padding: 7px 4px; font-size: 12px; }
 
   /* 설정 탭 섹션 구분 */
   .settings-section-title {
-    font-size: 11px; font-weight: 600; color: #444;
+    font-size: 12px; font-weight: 600; color: #444;
     margin: 14px 0 8px; padding-bottom: 5px;
     border-bottom: 1px solid #e8ecf2;
   }
@@ -229,9 +230,9 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 5px 12px; cursor: pointer; user-select: none;
   }
-  .log-toggle span { font-size: 10px; color: #888; font-weight: 500; }
+  .log-toggle span { font-size: 12px; color: #888; font-weight: 500; }
   .log {
-    font-size: 10.5px; padding: 6px 12px 8px; background: #f7f7f7;
+    font-size: 12px; padding: 6px 12px 8px; background: #f7f7f7;
     max-height: 130px; overflow-y: auto;
     font-family: "SF Mono", Menlo, Consolas, monospace;
     white-space: pre-wrap; word-break: break-all; display: none;
@@ -248,7 +249,7 @@
   }
   button.close-link {
     background: transparent; color: #aaa; border: none;
-    padding: 2px 0; font-size: 10.5px; font-weight: 400;
+    padding: 2px 0; font-size: 12px; font-weight: 400;
     text-decoration: underline; width: auto; margin: 0;
   }
   button.close-link:hover:enabled { color: #666; }
@@ -272,7 +273,7 @@
     font-size: 12px; font-weight: 700; color: #1a1a2e; margin: 0 0 6px;
   }
   .promo-lib-subtitle {
-    font-size: 10px; color: #6a7689; margin: 0 0 8px;
+    font-size: 12px; color: #6a7689; margin: 0 0 8px;
   }
   .promo-lib-search-row { display: flex; gap: 6px; margin-bottom: 6px; }
   .promo-lib-search-row input {
@@ -281,13 +282,13 @@
   }
   .promo-lib-search-row input:focus { outline: none; border-color: #18A0FB; }
   .promo-lib-search-row button {
-    padding: 6px 10px; font-size: 11px; margin: 0;
+    padding: 6px 10px; font-size: 12px; margin: 0;
     background: #5e72e4; color: #fff; border: none; border-radius: 5px;
     width: auto; cursor: pointer;
   }
   .promo-lib-filters { display: flex; gap: 4px; }
   .promo-lib-filters button {
-    padding: 4px 10px; font-size: 10.5px; margin: 0; width: auto;
+    padding: 4px 10px; font-size: 12px; margin: 0; width: auto;
     background: #f0f2f5; color: #666; border: 1px solid #dde2ec;
     border-radius: 14px; cursor: pointer;
   }
@@ -299,7 +300,7 @@
     background: #fafbfc;
   }
   .promo-lib-status {
-    font-size: 11px; color: #6a7689; text-align: center; padding: 20px 0;
+    font-size: 12px; color: #6a7689; text-align: center; padding: 20px 0;
   }
   .promo-lib-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
@@ -315,24 +316,24 @@
     width: 100%; aspect-ratio: 1;
     object-fit: contain; background: #fff; display: block;
   }
-  .promo-lib-item .plibel { font-size: 9.5px; color: #333; margin-top: 3px;
+  .promo-lib-item .plibel { font-size: 12px; color: #333; margin-top: 3px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .promo-lib-item .plisub { font-size: 8.5px; color: #888; margin-top: 1px; }
+  .promo-lib-item .plisub { font-size: 12px; color: #888; margin-top: 1px; }
   .promo-lib-item .pliview {
     position: absolute; top: 4px; left: 4px;
     background: rgba(0,0,0,0.55); color: #fff;
-    font-size: 8.5px; padding: 1px 4px; border-radius: 3px;
+    font-size: 12px; padding: 1px 4px; border-radius: 3px;
   }
   .promo-lib-item .plifav {
     position: absolute; top: 4px; right: 4px;
-    font-size: 11px; color: #ffb400;
+    font-size: 12px; color: #ffb400;
   }
   .promo-lib-foot {
     padding: 8px 12px; border-top: 1px solid #e8ecf2;
     display: flex; gap: 6px; flex-shrink: 0; background: #fff;
   }
   .promo-lib-foot button {
-    flex: 1; margin: 0; padding: 7px 4px; font-size: 11px;
+    flex: 1; margin: 0; padding: 7px 4px; font-size: 12px;
     border: none; border-radius: 5px; cursor: pointer;
   }
   .promo-lib-foot .plib-apply {
@@ -418,7 +419,7 @@
         </p>
       </details>
       <button id="upload" class="primary">Way 업로드</button>
-      <button id="zip-only" class="secondary" style="font-size:11px;padding:7px;">zip만 만들기 (검수용)</button>
+      <button id="zip-only" class="secondary" style="font-size:12px;padding:7px;">zip만 만들기 (검수용)</button>
     </div>
   </div>
 
@@ -445,13 +446,13 @@
             <option value="photoreal">실사 사진</option>
             <option value="illustration">2D 일러스트</option>
           </select>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10.5px;color:#444;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;color:#444;">
             <input type="checkbox" id="banner-emphasize-numbers" style="width:auto;margin:0;" />
             <label for="banner-emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자 강조 (예: 20000, 5%)</label>
           </div>
           <button id="banner-apply-image" class="btn-apply">적용 + 이미지 생성</button>
-          <button id="banner-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
-          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#444;">
+          <button id="banner-apply" class="secondary" style="font-size:12px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#444;">
             <input type="checkbox" id="banner-skip-preview" style="width:auto;margin:0;" />
             <label for="banner-skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용</label>
           </div>
@@ -495,13 +496,13 @@
             <option value="photoreal">실사 사진</option>
             <option value="illustration">2D 일러스트</option>
           </select>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10.5px;color:#444;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;color:#444;">
             <input type="checkbox" id="popup-emphasize-numbers" style="width:auto;margin:0;" />
             <label for="popup-emphasize-numbers" style="cursor:pointer;margin:0;">금액·% 숫자 강조 (예: 20000, 5%)</label>
           </div>
           <button id="popup-apply-image" class="btn-apply">적용 + 이미지 생성</button>
-          <button id="popup-apply" class="secondary" style="font-size:11px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
-          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#444;">
+          <button id="popup-apply" class="secondary" style="font-size:12px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#444;">
             <input type="checkbox" id="popup-skip-preview" style="width:auto;margin:0;" />
             <label for="popup-skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용</label>
           </div>
@@ -535,7 +536,7 @@
       <!-- 상세페이지 -->
       <div class="sub-tab-content" id="sub-detail">
         <div class="card">
-          <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
+          <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
             캔버스에서 기준 프레임 선택 (없어도 됨) → 종류·템플릿 선택 → [적용]<br/>
             선택한 프레임 바로 아래에 배치됩니다.
           </p>
@@ -559,13 +560,13 @@
       <!-- 소통참여 -->
       <div class="sub-tab-content" id="sub-sotong">
         <div class="card">
-          <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
-            프레임명 규칙: <code style="font-size:10px;">MMDD_image_소통참여_&#123;주제&#125;_top_984x552</code><br/>
+          <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
+            프레임명 규칙: <code style="font-size:12px;">MMDD_image_소통참여_&#123;주제&#125;_top_984x552</code><br/>
             프레임을 선택하면 이름에서 <b>주제</b>를 자동으로 뽑아냅니다.
           </p>
           <label class="lbl">선택된 프레임에서 감지된 주제</label>
           <input class="text-input" id="sotong-detected-subject" readonly placeholder="(감지된 소통참여 프레임 없음 — 프레임을 선택하세요)" style="background:#f4f5f7;" />
-          <div id="sotong-detected-name" style="font-size:10px;color:#6a7689;margin:-4px 0 8px;font-family:'SF Mono',Menlo,monospace;word-break:break-all;"></div>
+          <div id="sotong-detected-name" style="font-size:12px;color:#6a7689;margin:-4px 0 8px;font-family:'SF Mono',Menlo,monospace;word-break:break-all;"></div>
           <button id="sotong-apply-selected" class="btn-apply" disabled>선택 프레임에 이미지 생성</button>
 
           <div style="border-top:1px dashed #dbe5f2;margin:10px 0 10px;"></div>
@@ -605,7 +606,7 @@
 
     <div class="settings-section-title">배너 템플릿</div>
     <div class="card">
-      <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
+      <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
         라이브러리 인스턴스(배너) 선택 → [+ 등록]<br/>
         삭제: dropdown 선택 후 [삭제]
       </p>
@@ -617,7 +618,7 @@
 
     <div class="settings-section-title">팝업 템플릿</div>
     <div class="card">
-      <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
+      <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
         라이브러리 인스턴스(팝업) 선택 → [+ 등록]<br/>
         삭제: 적용 탭 dropdown 선택 후 [삭제]
       </p>
@@ -655,19 +656,19 @@
 
     <div class="settings-section-title">설정 백업</div>
     <div class="card">
-      <p style="font-size:10.5px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
+      <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.4;">
         팀원과 템플릿 설정을 공유하거나 새 기기에서 복원할 때 사용합니다.
       </p>
       <div class="btn-row">
-        <button id="cfg-export" class="btn-reg" style="font-size:11px;">↑ 내보내기</button>
-        <button id="cfg-import-btn" class="btn-reg" style="font-size:11px;">↓ 가져오기</button>
+        <button id="cfg-export" class="btn-reg" style="font-size:12px;">↑ 내보내기</button>
+        <button id="cfg-import-btn" class="btn-reg" style="font-size:12px;">↓ 가져오기</button>
         <input type="file" id="cfg-import-input" accept=".json" style="display:none;" />
       </div>
-      <p style="font-size:10.5px;color:#6a7689;margin:8px 0 8px;line-height:1.4;">
+      <p style="font-size:12px;color:#6a7689;margin:8px 0 8px;line-height:1.4;">
         팀 공용 저장소 (GitHub 등) 에서 최신 템플릿 설정을 받아옵니다. URL 은 helper config 의 <code>templates_sync_url</code>.
       </p>
       <div class="btn-row">
-        <button id="cfg-remote-sync" class="btn-reg" style="font-size:11px;">⟳ 원격 설정 동기화</button>
+        <button id="cfg-remote-sync" class="btn-reg" style="font-size:12px;">⟳ 원격 설정 동기화</button>
       </div>
     </div>
 
@@ -677,7 +678,7 @@
   <div class="log-area">
     <div class="log-toggle" id="log-toggle">
       <span id="log-toggle-label">▾ 로그</span>
-      <span id="log-count" style="font-size:10px;color:#aaa;"></span>
+      <span id="log-count" style="font-size:12px;color:#aaa;"></span>
     </div>
     <div class="log open" id="log"></div>
   </div>
