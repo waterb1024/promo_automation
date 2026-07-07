@@ -1182,10 +1182,11 @@ function prepareImageGenerate(opts) {
     return;
   }
 
-  // addon-home-top: 외곽 프레임 이름이 image_홈_... 로 시작해서 area 기반 picker 에서
+  // addon-*: 외곽 프레임 이름이 image_ 로 시작해서 area 기반 picker 에서
   // 외곽이 이겨버리는 문제가 있음. 정확히 name="image" 인 descendant 를 우선.
+  const isAddonKind = String(opts.kind || "").indexOf("addon-") === 0;
   let target = null;
-  if (opts.kind === "addon-home-top") {
+  if (isAddonKind) {
     target = _findDescendantByName(root, "image");
     // 명시적 image 슬롯이 없으면 root 를 제외한 하위에서 area picker
     if (!target && "children" in root) {
@@ -1237,6 +1238,257 @@ function prepareImageGenerate(opts) {
     kind: opts.kind || "popup",
     extraHint: opts.extraHint || null,
   });
+}
+
+// ─────────── 부가서비스 코드 내장 템플릿 빌더 ───────────
+// 라이브러리 인스턴스 등록 없이 코드로 프레임 구조를 생성. 5개 위치 지원.
+// 스타일 defaults 는 근사치이며, 지자체·프로젝트별로 사후 수정 가능하도록 이름·크기만 정확히 맞춤.
+
+const ADDON_FONT_REG = { family: "Pretendard", style: "Regular" };
+const ADDON_FONT_BOLD = { family: "Pretendard", style: "Bold" };
+const ADDON_FONT_SEMI = { family: "Pretendard", style: "SemiBold" };
+const ADDON_DEFAULT_BUTTON_HEX = "#6172DD";
+const ADDON_DEFAULT_TEXT_HEX = "#222222";
+const ADDON_DEFAULT_SUB_TEXT_HEX = "#666666";
+
+async function _addonLoadFonts() {
+  const fonts = [ADDON_FONT_REG, ADDON_FONT_BOLD, ADDON_FONT_SEMI,
+                 { family: "Inter", style: "Regular" },
+                 { family: "Inter", style: "Bold" }];
+  for (let i = 0; i < fonts.length; i++) {
+    try { await figma.loadFontAsync(fonts[i]); } catch (e) { /* keep going */ }
+  }
+}
+
+function _addonHexToRgb(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || ""));
+  if (!m) return { r: 0.5, g: 0.5, b: 0.5 };
+  return {
+    r: parseInt(m[1], 16) / 255,
+    g: parseInt(m[2], 16) / 255,
+    b: parseInt(m[3], 16) / 255,
+  };
+}
+function _addonSolid(hex, visible) {
+  return [{ type: "SOLID", color: _addonHexToRgb(hex), visible: visible !== false }];
+}
+
+function _addonMkFrame(parent, opts) {
+  const f = figma.createFrame();
+  f.name = opts.name || "Frame";
+  if (opts.x !== undefined) f.x = opts.x;
+  if (opts.y !== undefined) f.y = opts.y;
+  if (opts.width && opts.height) f.resize(opts.width, opts.height);
+  f.fills = opts.fills === undefined ? [] : opts.fills;
+  if (opts.cornerRadius !== undefined) f.cornerRadius = opts.cornerRadius;
+  if (opts.clipsContent !== undefined) f.clipsContent = opts.clipsContent;
+  if (parent) parent.appendChild(f);
+  return f;
+}
+
+async function _addonMkText(parent, opts) {
+  const font = opts.font || ADDON_FONT_REG;
+  try { await figma.loadFontAsync(font); } catch (e) {
+    try { await figma.loadFontAsync(ADDON_FONT_REG); } catch (_) {}
+  }
+  const t = figma.createText();
+  t.name = opts.name || "TEXT";
+  t.fontName = font;
+  if (opts.fontSize) t.fontSize = opts.fontSize;
+  if (opts.characters !== undefined) t.characters = opts.characters || " ";
+  if (opts.x !== undefined) t.x = opts.x;
+  if (opts.y !== undefined) t.y = opts.y;
+  if (opts.width && opts.height) {
+    try { t.resize(opts.width, opts.height); } catch (e) {}
+  }
+  if (opts.color) t.fills = _addonSolid(opts.color);
+  if (opts.textAlignHorizontal) t.textAlignHorizontal = opts.textAlignHorizontal;
+  if (opts.textAutoResize) t.textAutoResize = opts.textAutoResize;
+  if (parent) parent.appendChild(t);
+  return t;
+}
+
+// 홈 상단 (1080×528 → display 360×176)
+async function buildAddonHomeTop(opts) {
+  opts = opts || {};
+  const svc = opts.serviceName || "서비스명";
+  const outer = _addonMkFrame(null, {
+    name: "image_홈_" + svc + "_top_1080x528",
+    width: 360, height: 176, fills: [],
+  });
+  figma.currentPage.appendChild(outer);
+  const text = _addonMkFrame(outer, { name: "text", x: 24, y: 0, width: 312, height: 168 });
+  const con  = _addonMkFrame(text,  { name: "con",  x: 0, y: 0, width: 312, height: 132 });
+  const txt  = _addonMkFrame(con,   { name: "txt",  x: 0, y: 0, width: 154, height: 132 });
+  await _addonMkText(txt, {
+    name: "TEXT", x: 0, y: 32, width: 145, height: 72,
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, color: ADDON_DEFAULT_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  _addonMkFrame(con, { name: "image", x: 164, y: 0, width: 148, height: 132 });
+  const btn = _addonMkFrame(text, {
+    name: "Button/small", x: 0, y: 132, width: 312, height: 36,
+    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 6,
+  });
+  await _addonMkText(btn, {
+    name: "TEXT", x: 0, y: 8, width: 312, height: 20,
+    characters: "", font: ADDON_FONT_SEMI, fontSize: 14, color: "#ffffff",
+    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+  });
+  return outer;
+}
+
+// 홈 중단 (360×378 → display 120×126)
+async function buildAddonHomeMiddle(opts) {
+  opts = opts || {};
+  const svc = opts.serviceName || "서비스명";
+  const outer = _addonMkFrame(null, {
+    name: "image_홈_" + svc + "_middle_360x378",
+    width: 120, height: 126, fills: [],
+  });
+  figma.currentPage.appendChild(outer);
+  _addonMkFrame(outer, {
+    name: "bg", x: 0, y: 6, width: 120, height: 120,
+    fills: _addonSolid("#f0f2f5"), cornerRadius: 12,
+  });
+  _addonMkFrame(outer, { name: "image", x: 44, y: 14, width: 32, height: 32 });
+  const textFrame = _addonMkFrame(outer, { name: "text", x: 0, y: 46, width: 120, height: 80 });
+  await _addonMkText(textFrame, {
+    name: "TEXT", x: 7.5, y: 25, width: 105, height: 39,
+    characters: "", font: ADDON_FONT_REG, fontSize: 11, color: ADDON_DEFAULT_TEXT_HEX,
+    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+  });
+  return outer;
+}
+
+// 생활편의 상단 (984×840 → display 328×280)
+async function buildAddonLifeTop(opts) {
+  opts = opts || {};
+  const svc = opts.serviceName || "서비스명";
+  const outer = _addonMkFrame(null, {
+    name: "image_생활편의_" + svc + "_top_984x840",
+    width: 328, height: 280,
+    fills: _addonSolid("#ffffff"), cornerRadius: 12,
+  });
+  figma.currentPage.appendChild(outer);
+  const inner  = _addonMkFrame(outer, { name: "content", x: 16, y: 16, width: 296, height: 196 });
+  const subTit = _addonMkFrame(inner, { name: "sub_tit", x: 0, y: 0, width: 296, height: 20 });
+  _addonMkFrame(subTit, { name: "icon_20", x: 0, y: 0, width: 20, height: 20 });
+  await _addonMkText(subTit, {
+    name: "svc_name", x: 24, y: 1, width: 200, height: 18,
+    characters: svc, font: ADDON_FONT_SEMI, fontSize: 13, color: ADDON_DEFAULT_SUB_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  const body = _addonMkFrame(inner, { name: "body", x: 0, y: 26, width: 296, height: 44 });
+  await _addonMkText(body, {
+    name: "TEXT", x: 0, y: 0, width: 296, height: 44,
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 16, color: ADDON_DEFAULT_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  _addonMkFrame(inner, { name: "image", x: 66, y: 78, width: 164, height: 118 });
+  const btn = _addonMkFrame(outer, {
+    name: "Button/small", x: 16, y: 228, width: 296, height: 36,
+    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 6,
+  });
+  await _addonMkText(btn, {
+    name: "TEXT", x: 0, y: 8, width: 296, height: 20,
+    characters: "", font: ADDON_FONT_SEMI, fontSize: 14, color: "#ffffff",
+    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+  });
+  return outer;
+}
+
+// 생활편의 하단 (1080×가변 → display 360×400 기본)
+async function buildAddonLifeBottom(opts) {
+  opts = opts || {};
+  const svc = opts.serviceName || "서비스명";
+  const outer = _addonMkFrame(null, {
+    name: "image_생활편의_" + svc + "_bottom_1080",
+    width: 360, height: 400, fills: _addonSolid("#ffffff"),
+  });
+  figma.currentPage.appendChild(outer);
+  const con = _addonMkFrame(outer, { name: "con", x: 0, y: 0, width: 360, height: 84 });
+  const tit = _addonMkFrame(con, { name: "tit", x: 0, y: 0, width: 360, height: 84 });
+  const head = _addonMkFrame(tit, { name: "head", x: 16, y: 16, width: 328, height: 52 });
+  const svcRow = _addonMkFrame(head, { name: "service", x: 0, y: 0, width: 240, height: 28 });
+  _addonMkFrame(svcRow, { name: "icon_20", x: 0, y: 4, width: 20, height: 20 });
+  await _addonMkText(svcRow, {
+    name: "svc_name", x: 24, y: 5, width: 216, height: 18,
+    characters: svc, font: ADDON_FONT_SEMI, fontSize: 13, color: ADDON_DEFAULT_SUB_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  await _addonMkText(head, {
+    name: "TEXT", x: 0, y: 28, width: 328, height: 24,
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 16, color: ADDON_DEFAULT_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  const body = _addonMkFrame(outer, { name: "body", x: 0, y: 84, width: 360, height: 316 });
+  _addonMkFrame(body, { name: "image", x: 32, y: 16, width: 296, height: 220 });
+  const btn = _addonMkFrame(body, {
+    name: "Button/medium", x: 16, y: 252, width: 328, height: 44,
+    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 6,
+  });
+  await _addonMkText(btn, {
+    name: "TEXT", x: 0, y: 12, width: 328, height: 20,
+    characters: "", font: ADDON_FONT_SEMI, fontSize: 14, color: "#ffffff",
+    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+  });
+  return outer;
+}
+
+// 소통참여 하단 (480×348 → display 160×116)
+async function buildAddonSotongBottom(opts) {
+  opts = opts || {};
+  const svc = opts.serviceName || "서비스명";
+  const outer = _addonMkFrame(null, {
+    name: "banner_소통참여_" + svc + "_bottom_480x348",
+    width: 160, height: 116,
+    fills: _addonSolid("#f8faff"), cornerRadius: 8,
+  });
+  figma.currentPage.appendChild(outer);
+  const head = _addonMkFrame(outer, { name: "head", x: 16, y: 16, width: 128, height: 20 });
+  _addonMkFrame(head, { name: "icon_20", x: 0, y: 0, width: 20, height: 20 });
+  await _addonMkText(head, {
+    name: "svc_name", x: 24, y: 1, width: 100, height: 18,
+    characters: svc, font: ADDON_FONT_SEMI, fontSize: 13, color: ADDON_DEFAULT_SUB_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  const txt = _addonMkFrame(outer, { name: "txt", x: 16, y: 44, width: 128, height: 56 });
+  await _addonMkText(txt, {
+    name: "TEXT", x: 0, y: 12, width: 128, height: 44,
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 12, color: ADDON_DEFAULT_TEXT_HEX,
+    textAutoResize: "NONE",
+  });
+  // 소통참여는 텍스트 위주지만 이미지 슬롯도 함께 두어 3D 아이콘/일러스트를 배치 가능
+  _addonMkFrame(outer, { name: "image", x: 100, y: 44, width: 48, height: 48 });
+  return outer;
+}
+
+// 스펙 텍스트에서 서비스명 후보 추출 (짧은 명사 우선). 없으면 null.
+// 지자체마다 상이 → 정확한 추출은 불가능. 4~10자 한글 명사가 있으면 후보로 채택.
+function _guessServiceNameFromTexts(texts) {
+  if (!texts || texts.length === 0) return null;
+  const svcPattern = /^[가-힣][가-힣0-9A-Za-z]{2,9}$/;
+  for (let i = 0; i < texts.length; i++) {
+    const t = String(texts[i]).trim();
+    if (svcPattern.test(t)) return t;
+  }
+  return null;
+}
+
+const ADDON_BUILDERS = {
+  "home-top":       buildAddonHomeTop,
+  "home-middle":    buildAddonHomeMiddle,
+  "life-top":       buildAddonLifeTop,
+  "life-bottom":    buildAddonLifeBottom,
+  "sotong-bottom":  buildAddonSotongBottom,
+};
+
+async function buildAddonTemplateByPosition(position, opts) {
+  const fn = ADDON_BUILDERS[position];
+  if (!fn) return null;
+  await _addonLoadFonts();
+  return await fn(opts || {});
 }
 
 // ─────────── 부가서비스 템플릿 CRUD ───────────
@@ -1328,29 +1580,45 @@ async function createAddonFromSpec(position) {
     return;
   }
 
-  // 등록된 템플릿 조회
+  // 템플릿 확보: 우선 등록된 라이브러리 인스턴스 → 없으면 코드 내장 builder 로 폴백
   const map = await _getAddonTemplates();
   const tpl = map[position];
-  if (!tpl || !tpl.key) {
-    postError("설정 탭 → 부가서비스 템플릿에서 [" + position + "] 위치를 먼저 등록해주세요.");
-    return;
+  let inst = null;
+  let templateName = "";
+  let templateSource = "";
+  if (tpl && tpl.key) {
+    try {
+      const comp = await figma.importComponentByKeyAsync(tpl.key);
+      inst = comp.createInstance();
+      figma.currentPage.appendChild(inst);
+      templateName = tpl.name || "(라이브러리)";
+      templateSource = "library";
+    } catch (e) {
+      // 실패시 builder 로 폴백
+      inst = null;
+    }
   }
-
-  // 컴포넌트 import + instance 생성
-  let comp;
-  try {
-    comp = await figma.importComponentByKeyAsync(tpl.key);
-  } catch (e) {
-    postError("템플릿 컴포넌트 import 실패: " + (e && e.message ? e.message : String(e)));
-    return;
+  if (!inst) {
+    // 서비스명 힌트: 스펙 셀 첫 텍스트에서 짧은 명사(라벨 후보) 를 추출.
+    // 없으면 "서비스명" 그대로 두고 사용자가 수정.
+    const svcHint = _guessServiceNameFromTexts(texts) || "서비스명";
+    const built = await buildAddonTemplateByPosition(position, { serviceName: svcHint });
+    if (!built) {
+      postError("[" + position + "] 위치용 코드 내장 builder 를 찾지 못했습니다.");
+      return;
+    }
+    inst = built;
+    templateName = "(코드 내장) " + inst.name;
+    templateSource = "code";
   }
-  const inst = comp.createInstance();
-  figma.currentPage.appendChild(inst);
   inst.x = specNode.x + specNode.width + 24;
   inst.y = specNode.y;
 
-  // 텍스트 슬롯 채움 (top-down 순서 매핑)
-  const slots = _collectPlaceholdersOrdered(inst);
+  // 텍스트 슬롯 채움: 이미 의미 있는 문자열이 있는 노드(예: 서비스명 라벨)는 skip.
+  const allSlots = _collectPlaceholdersOrdered(inst);
+  const slots = allSlots.filter(function (t) {
+    return _isPlaceholderText(String(t.characters).trim());
+  });
   const filled = Math.min(slots.length, texts.length);
   const fontFallbacks = [];
   for (let i = 0; i < filled; i++) {
@@ -1381,10 +1649,11 @@ async function createAddonFromSpec(position) {
     newNodeName: inst.name,
     specNodeId: specNode.id,
     texts_extracted: texts.length,
-    slots_available: slots.length,
+    slots_available: allSlots.length,
     slots_filled: filled,
     font_fallbacks: fontFallbacks,
-    templateName: tpl.name,
+    templateName: templateName,
+    templateSource: templateSource,   // "library" | "code"
   });
 }
 
@@ -1506,7 +1775,9 @@ async function applyGeneratedImage(msg) {
   const bgHex = msg && msg.backgroundColor;
   const buttonHex = msg && msg.buttonColor;
   const applyMode = msg && msg.applyMode;
-  const bgVisible = applyMode !== "addon-home-top";  // addon 홈 상단은 hidden
+  // addon-* 계열은 모두 bg fill 을 hidden 으로 저장 (baked-in pastel 이 이미지에 있으므로).
+  const isAddonApply = String(applyMode || "").indexOf("addon-") === 0;
+  const bgVisible = !isAddonApply;
   if (frameNodeId && bgHex) {
     const rgb = _hexToRgbNormalized(bgHex);
     if (rgb) {
@@ -1523,8 +1794,8 @@ async function applyGeneratedImage(msg) {
           }];
           frameBgApplied = bgHex;
         }
-        // addon 홈 상단: 프레임명 끝 _#hex 교체 (없으면 append)
-        if (frameNode && applyMode === "addon-home-top") {
+        // addon-*: 프레임명 끝 _#hex 교체 (없으면 append)
+        if (frameNode && isAddonApply) {
           const oldName = String(frameNode.name || "");
           const newName = _replaceOrAppendHexSuffix(oldName, bgHex);
           if (newName !== oldName) {
@@ -1533,14 +1804,23 @@ async function applyGeneratedImage(msg) {
             frameRenamedTo = newName;
           }
         }
-        // addon 홈 상단: Button/small child 에 버튼색 적용
-        if (frameNode && applyMode === "addon-home-top" && buttonHex) {
+        // addon-*: 버튼 descendant 에 버튼색 적용
+        // 정확히 "Button/small" 이 아닌 경우도 흔함 (Button, button/large, button primary 등)
+        if (frameNode && isAddonApply && buttonHex) {
           const btnRgb = _hexToRgbNormalized(buttonHex);
           if (btnRgb) {
-            const btnNode = _findDescendantByName(frameNode, "Button/small");
+            const btnNode = _findButtonDescendant(frameNode);
             if (btnNode && "fills" in btnNode) {
-              btnNode.fills = [{ type: "SOLID", color: btnRgb, visible: true }];
-              buttonColorApplied = buttonHex;
+              try {
+                btnNode.fills = [{ type: "SOLID", color: btnRgb, visible: true }];
+                buttonColorApplied = buttonHex;
+              } catch (btnErr) {
+                buttonColorApplied = "ERROR:" + (btnErr && btnErr.message ? btnErr.message : String(btnErr)) +
+                  " (node=\"" + btnNode.name + "\")";
+              }
+            } else {
+              buttonColorApplied = "NOT_FOUND: 버튼 노드를 찾지 못했습니다. " +
+                "프레임 안에 이름이 'Button/small', 'Button', 'button/...' 등 인 노드가 있어야 합니다.";
             }
           }
         }
@@ -1570,6 +1850,40 @@ function _replaceOrAppendHexSuffix(name, hex) {
   const re = /_#[0-9a-fA-F]{6}$/;
   if (re.test(name)) return name.replace(re, "_" + norm);
   return name + "_" + norm;
+}
+
+// 버튼 descendant 를 유연하게 탐색.
+// 실제 인스턴스에서 이름이 "Button/small" 정확히 매치되지 않는 경우가 잦음
+// (variant 오버라이드, 대소문자, 슬래시 변형 등). 아래 우선순위로 매치.
+function _findButtonDescendant(node) {
+  if (!node) return null;
+  const candidates = [];
+  const queue = [node];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur !== node) {  // 루트는 제외
+      const nm = String(cur.name || "").toLowerCase().trim();
+      // 1순위: "button/small" 정확
+      // 2순위: "button/..." 으로 시작 (variant)
+      // 3순위: 단독 "button" 또는 "button "/tab 시작
+      let score = 0;
+      if (nm === "button/small") score = 100;
+      else if (nm.indexOf("button/") === 0) score = 80;
+      else if (nm === "button") score = 60;
+      else if (nm.indexOf("button ") === 0 || nm.indexOf("button\t") === 0) score = 40;
+      else if (nm.indexOf("btn") === 0 || nm.indexOf("/btn") >= 0) score = 20;
+      if (score > 0 && (cur.type === "INSTANCE" || cur.type === "FRAME" ||
+                        cur.type === "COMPONENT" || cur.type === "RECTANGLE")) {
+        candidates.push({ score: score, node: cur });
+      }
+    }
+    if (cur.children && cur.children.length > 0) {
+      for (let i = 0; i < cur.children.length; i++) queue.push(cur.children[i]);
+    }
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort(function (a, b) { return b.score - a.score; });
+  return candidates[0].node;
 }
 
 // 이름이 정확히 일치하는 descendant 를 BFS 로 탐색.

@@ -1492,45 +1492,58 @@
     // ── 위치별 프롬프트 스타일 매핑 ──
     // 홈 상단 · 생활편의 상단 → "3d-solid-pastel" (배경까지 pastel 로 baked in)
     // 홈 중단              → "2d-flat-solid"   (아이콘 그리드용 flat 벡터)
-    // 그 외 (미구현 위치)   → 기본 "3d"
+    // 그 외                → 기본 "3d" (transparent 배경)
     const POSITION_STYLE_MAP = {
-      "home-top": "3d-solid-pastel",
-      "life-top": "3d-solid-pastel",
-      "home-middle": "2d-flat-solid",
+      "home-top":      "3d-solid-pastel",
+      "life-top":      "3d-solid-pastel",
+      "home-middle":   "2d-flat-solid",
+      "life-bottom":   "3d",
+      "sotong-bottom": "3d",
+    };
+    // 위치별 apply kind — code.js 의 target picker/branch 가 이 값을 씀
+    const POSITION_KIND_MAP = {
+      "home-top":      "addon-home-top",
+      "home-middle":   "addon-home-middle",
+      "life-top":      "addon-life-top",
+      "life-bottom":   "addon-life-bottom",
+      "sotong-bottom": "addon-sotong-bottom",
+    };
+    // 위치별 selection 이 이미 해당 템플릿 인스턴스인지 판단하는 정규식
+    const POSITION_EXISTING_RE = {
+      "home-top":      /^image_홈_.+_top_/,
+      "home-middle":   /^image_홈_.+_middle_/,
+      "life-top":      /^image_생활편의_.+_top_/,
+      "life-bottom":   /^image_생활편의_.+_bottom_/,
+      "sotong-bottom": /^banner_소통참여_.+_bottom_/,
     };
     const positionStyle = POSITION_STYLE_MAP[position] || "3d";
+    const applyKind     = POSITION_KIND_MAP[position]  || "addon-home-top";
+    const existingRe    = POSITION_EXISTING_RE[position];
 
-    // ── 홈 상단: 선택 프레임이 이미 홈 상단 템플릿(이름이 image_홈_ 로 시작)이면
-    //           바로 image_generate_prepare, 아니면 기획 셀로 판단 → addon_from_spec ──
-    if (position !== "home-top") {
-      log("✗ 현재는 [아이콘] 과 [홈 상단] 만 지원됩니다. 다른 위치는 추후 지원 예정.", "error");
-      return;
-    }
     const selName = (_selectionInfo && _selectionInfo.frames && _selectionInfo.frames[0])
       ? _selectionInfo.frames[0].name : "";
-    const isExistingTemplate = /^image_홈_.+_top_/.test(selName);
+    const isExistingTemplate = existingRe && existingRe.test(selName);
 
     _imageGenPending = {
       kind: "addon",
-      applyMode: "addon-home-top",
+      applyMode: applyKind,
       extraHint: feedback,
       style: positionStyle,
     };
     setBusy(true);
     _imgGenStart("addon");
     if (isExistingTemplate) {
-      _imgGenSetStage("이미지 자리 탐색 중…", "홈 상단 템플릿 확인");
-      log("[부가서비스 홈 상단] 선택 프레임(" + selName + ")에서 이미지 생성 준비", "muted");
+      _imgGenSetStage("이미지 자리 탐색 중…", position + " 템플릿 확인");
+      log("[부가서비스 " + position + "] 선택 프레임(" + selName + ")에서 이미지 생성 준비", "muted");
       parent.postMessage({
-        pluginMessage: { type: "image_generate_prepare", kind: "addon-home-top", extraHint: feedback },
+        pluginMessage: { type: "image_generate_prepare", kind: applyKind, extraHint: feedback },
       }, "*");
     } else {
       _imgGenSetStage("기획 셀 → 새 템플릿 생성 중…", selName || "선택 프레임");
-      log("[부가서비스 홈 상단] 기획 셀에서 텍스트 추출 + 새 템플릿 생성 (설정 탭 등록 템플릿 사용)", "muted");
-      // 이후 addon_from_spec_done 수신 시 image_generate_prepare 자동 체인
-      _chainImageGenAfterApply = { kind: "addon-home-top", extraHint: feedback, style: "3d" };
+      log("[부가서비스 " + position + "] 기획 셀에서 텍스트 추출 + 새 템플릿 생성 (등록 없으면 코드 내장 fallback)", "muted");
+      _chainImageGenAfterApply = { kind: applyKind, extraHint: feedback, style: positionStyle };
       parent.postMessage({
-        pluginMessage: { type: "addon_from_spec", position: "home-top" },
+        pluginMessage: { type: "addon_from_spec", position: position },
       }, "*");
     }
   }
@@ -1685,7 +1698,7 @@
         frameNodeId: isSotong ? null : s.context.frameNodeId,
         backgroundColor: isSotong ? null : s.bgColor,
         buttonColor: isAddon ? s.buttonColor : null,
-        applyMode: isAddon ? (s.context.applyMode || "addon-home-top") : null,
+        applyMode: isAddon ? (s.context.applyMode || s.context.kind || "addon-home-top") : null,
         base64: s.base64,
         prompt: s.prompt,
       },
@@ -2159,7 +2172,14 @@
           log("  ✓ 프레임 배경색 적용: " + msg.frameBgApplied, "info");
       }
       if (msg.buttonColorApplied) {
-        log("  ✓ 버튼색 적용: " + msg.buttonColorApplied, "info");
+        const bc = String(msg.buttonColorApplied);
+        if (bc.indexOf("NOT_FOUND") === 0) {
+          log("  ⚠ 버튼색 미적용 — " + bc.slice(10).trim(), "warn");
+        } else if (bc.indexOf("ERROR:") === 0) {
+          log("  ⚠ 버튼색 적용 실패 — " + bc.slice(6).trim(), "warn");
+        } else {
+          log("  ✓ 버튼색 적용: " + bc, "info");
+        }
       }
       if (msg.frameRenamedTo) {
         log("  ✓ 프레임명 갱신: " + msg.frameRenamedFrom + " → " + msg.frameRenamedTo, "info");

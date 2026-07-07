@@ -17,9 +17,38 @@
 | `life-bottom` | 생활편의 하단 (1080×가변) | 미구현 |
 | `sotong-bottom` | 소통참여 하단 (480×348) | 미구현 |
 
-### 설정 탭 · 부가서비스 템플릿
+### 설정 탭 · 부가서비스 템플릿 (선택 사항 — 이제는 fallback)
 
-위치별로 라이브러리 인스턴스 1개씩 등록. `clientStorage:addon_templates` 에 `{ position: { name, key, registered_at } }` 형태로 저장. 지자체마다 서비스명만 다르고 프레임 규격은 같아서 위치당 1 템플릿을 재사용.
+위치별로 라이브러리 인스턴스 1개씩 등록하면 `clientStorage:addon_templates` 에 저장되어 우선 사용됨. **등록이 없어도 코드 내장 builder 가 자동 fallback** 으로 프레임을 생성한다 (2026-07 이후).
+
+### 코드 내장 builder (`ADDON_BUILDERS`)
+
+라이브러리 컴포넌트 없이 5개 위치 프레임을 100% 코드로 생성. `figma.createFrame` / `figma.createText` / `.resize()` / `.fills` / `.cornerRadius` 로 구조·크기·기본 스타일 지정.
+
+| Position | Builder | 명명 규칙 (초기값) | 주요 슬롯 |
+|---|---|---|---|
+| `home-top` | `buildAddonHomeTop` | `image_홈_{svc}_top_1080x528` | txt/TEXT · image · Button/small (+ TEXT) |
+| `home-middle` | `buildAddonHomeMiddle` | `image_홈_{svc}_middle_360x378` | bg (rounded) · image · text/TEXT |
+| `life-top` | `buildAddonLifeTop` | `image_생활편의_{svc}_top_984x840` | sub_tit (icon_20 + svc_name) · body/TEXT · image · Button/small |
+| `life-bottom` | `buildAddonLifeBottom` | `image_생활편의_{svc}_bottom_1080` | tit/head (icon_20 + svc_name + TEXT) · image · Button/medium |
+| `sotong-bottom` | `buildAddonSotongBottom` | `banner_소통참여_{svc}_bottom_480x348` | head (icon_20 + svc_name) · txt/TEXT · image |
+
+**스타일 defaults** (모두 Pretendard 기반, 사후 수정 가능):
+- 메인 카피: Bold, 14~16px, `#222222`
+- 서브 라벨(svc_name): SemiBold, 13px, `#666666`
+- 버튼 배경: `#6172DD` (KONA primary — apply 시 saturated 파생색으로 덮어써짐)
+- 버튼 텍스트: SemiBold, 14px, `#ffffff`
+- 코너 라운드: 6~12px
+
+**서비스명 힌트 자동 추출** (`_guessServiceNameFromTexts`): 스펙 셀 텍스트 중 `^[가-힣][가-힣0-9A-Za-z]{2,9}$` 정규식 매치 첫 항목을 서비스명 후보로 사용. 매치 없으면 `"서비스명"` placeholder → 사용자가 수정.
+
+### fallback 우선순위
+
+`createAddonFromSpec(position)` 실행 시:
+1. `addon_templates[position].key` 로 `importComponentByKeyAsync` 시도
+2. 실패 또는 미등록 → `buildAddonTemplateByPosition(position, { serviceName })` 으로 코드 내장 생성
+
+응답의 `templateSource` 필드에 `"library"` 또는 `"code"` 로 표시.
 
 ## 프롬프트 템플릿 (helper `IMAGE_PROMPT_TEMPLATES`)
 
@@ -145,6 +174,7 @@ if wants_transparent:
 
 ## 향후 작업
 
-- 홈 중단·생활편의 상단/하단·소통참여 하단 위치별 apply 로직 (홈 상단 패턴 확장)
+- 코드 내장 builder 의 스타일 defaults 를 지자체 브랜딩에 맞게 튜닝하는 옵션(폰트 크기·컬러 오버라이드)
 - 기획 스펙 시트(Excel/CSV) 파싱 → 지자체 × 위치 × 서비스 배치 자동 생성
 - 지자체 컨텍스트 저장 (서비스 목록·3D 아이콘 캐시·컬러)
+- 홈 상단·생활편의 상단 이미지에 baked-in 된 pastel bg 를 이미지 슬롯 크기에 맞게 crop 하는 후처리
