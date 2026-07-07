@@ -1586,11 +1586,22 @@ async function createAddonFromSpec(position) {
   let inst = null;
   let templateName = "";
   let templateSource = "";
+  let detached = false;
   if (tpl && tpl.key) {
     try {
       const comp = await figma.importComponentByKeyAsync(tpl.key);
-      inst = comp.createInstance();
-      figma.currentPage.appendChild(inst);
+      const rawInst = comp.createInstance();
+      figma.currentPage.appendChild(rawInst);
+      // 사용자 요청: 라이브러리 인스턴스 → 즉시 detach 해서 순수 FRAME 으로 전환.
+      // 이유: 프레임명 _#hex 갱신·자식 노드 fills override 가 main component sync 에 되돌려질
+      // 위험을 없애고, 이후 편집이 라이브러리와 독립되도록.
+      try {
+        inst = rawInst.detachInstance();
+        detached = true;
+      } catch (dErr) {
+        // detach 실패 (예: 컴포넌트 아님) → 원본 인스턴스 그대로 사용
+        inst = rawInst;
+      }
       templateName = tpl.name || "(라이브러리)";
       templateSource = "library";
     } catch (e) {
@@ -1614,10 +1625,14 @@ async function createAddonFromSpec(position) {
   inst.x = specNode.x + specNode.width + 24;
   inst.y = specNode.y;
 
-  // 텍스트 슬롯 채움: 이미 의미 있는 문자열이 있는 노드(예: 서비스명 라벨)는 skip.
+  // 텍스트 슬롯 채움: 스펙 셀 텍스트를 top-down 순서대로 인스턴스 텍스트 노드에 덮어씀.
+  // 라이브러리 인스턴스는 원본 문구가 이미 있고 (placeholder 로 잡히지 않음),
+  // 코드 내장 build 결과는 " " 로 초기화됨. 두 경우 모두 채워지도록 필터는 name 기반으로만.
+  // svc_/static_/label_/logo_/badge_ 로 시작하거나 _static/_label 로 끝나는 노드만 skip.
+  const skipNamePattern = /^(svc_|static_|label_|logo_|badge_)|_static$|_label$/i;
   const allSlots = _collectPlaceholdersOrdered(inst);
   const slots = allSlots.filter(function (t) {
-    return _isPlaceholderText(String(t.characters).trim());
+    return !skipNamePattern.test(String(t.name || ""));
   });
   const filled = Math.min(slots.length, texts.length);
   const fontFallbacks = [];
@@ -1654,6 +1669,7 @@ async function createAddonFromSpec(position) {
     font_fallbacks: fontFallbacks,
     templateName: templateName,
     templateSource: templateSource,   // "library" | "code"
+    detached: detached,               // library 인스턴스는 즉시 detach 됨
   });
 }
 
@@ -1804,24 +1820,52 @@ async function applyGeneratedImage(msg) {
             frameRenamedTo = newName;
           }
         }
-        // addon-*: 버튼 descendant 에 버튼색 적용
-        // 정확히 "Button/small" 이 아닌 경우도 흔함 (Button, button/large, button primary 등)
-        if (frameNode && isAddonApply && buttonHex) {
-          const btnRgb = _hexToRgbNormalized(buttonHex);
-          if (btnRgb) {
-            const btnNode = _findButtonDescendant(frameNode);
-            if (btnNode && "fills" in btnNode) {
-              try {
-                btnNode.fills = [{ type: "SOLID", color: btnRgb, visible: true }];
-                buttonColorApplied = buttonHex;
-              } catch (btnErr) {
-                buttonColorApplied = "ERROR:" + (btnErr && btnErr.message ? btnErr.message : String(btnErr)) +
-                  " (node=\"" + btnNode.name + "\")";
+        // addon-*: 버튼 descendant 에 그라데이션 fill (또는 solid) 적용.
+        // 우선순위: buttonGradient > buttonColor (backward compat)
+        const buttonGradient = msg && msg.buttonGradient;
+        if (frameNode && isAddonApply && (buttonGradient || buttonHex)) {
+          const btnNode = _findButtonDescendant(frameNode);
+          if (btnNode && "fills" in btnNode) {
+            try {
+              if (buttonGradient && buttonGradient.start && buttonGradient.end) {
+                const s = _hexToRgbNormalized(buttonGradient.start);
+                const e = _hexToRgbNormalized(buttonGradient.end);
+                if (s && e) {
+                  btnNode.fills = [{
+                    type: "GRADIENT_LINEAR",
+                    // 좌 → 우 수평 그라데이션 (Figma 참조 137:5016 과 동일)
+                    gradientTransform: [[1, 0, 0], [0, 1, 0]],
+                    gradientStops: [
+                      { position: 0, color: { r: s.r, g: s.g, b: s.b, a: 1 } },
+                      { position: 1, color: { r: e.r, g: e.g, b: e.b, a: 1 } },
+                    ],
+                  }];
+                  buttonColorApplied = "gradient " + buttonGradient.start + " → " + buttonGradient.end +
+                    " (node=\"" + btnNode.name + "\" · " + btnNode.type + ")";
+                }
+              } else if (buttonHex) {
+                const btnRgb = _hexToRgbNormalized(buttonHex);
+                if (btnRgb) {
+                  btnNode.fills = [{ type: "SOLID", color: btnRgb, visible: true }];
+                  buttonColorApplied = buttonHex + " (node=\"" + btnNode.name + "\" · " + btnNode.type + ")";
+                }
               }
-            } else {
-              buttonColorApplied = "NOT_FOUND: 버튼 노드를 찾지 못했습니다. " +
-                "프레임 안에 이름이 'Button/small', 'Button', 'button/...' 등 인 노드가 있어야 합니다.";
+            } catch (btnErr) {
+              buttonColorApplied = "ERROR:" + (btnErr && btnErr.message ? btnErr.message : String(btnErr)) +
+                " (node=\"" + btnNode.name + "\")";
             }
+          } else {
+            const childNames = [];
+            try {
+              const q = [frameNode];
+              while (q.length > 0 && childNames.length < 20) {
+                const c = q.shift();
+                if (c !== frameNode) childNames.push(c.name);
+                if (c.children) for (let i = 0; i < c.children.length; i++) q.push(c.children[i]);
+              }
+            } catch (e) {}
+            buttonColorApplied = "NOT_FOUND: 버튼 노드를 찾지 못했습니다. " +
+              "탐색된 자식 노드 이름: [" + childNames.slice(0, 15).join(", ") + "]";
           }
         }
       } catch (e) {
@@ -1852,9 +1896,11 @@ function _replaceOrAppendHexSuffix(name, hex) {
   return name + "_" + norm;
 }
 
-// 버튼 descendant 를 유연하게 탐색.
-// 실제 인스턴스에서 이름이 "Button/small" 정확히 매치되지 않는 경우가 잦음
-// (variant 오버라이드, 대소문자, 슬래시 변형 등). 아래 우선순위로 매치.
+// 버튼 descendant 를 유연하게 탐색. 실제 인스턴스에서 이름 정확 매치가 어려움:
+//   - Figma variant 인스턴스는 "Button/Size=small" 처럼 property syntax 를 가짐
+//   - 팀 라이브러리 컴포넌트 별로 "Button/small", "Button", "btn primary" 등 상이
+// 전략: 이름에 "button" 또는 "btn" 이 포함된 컨테이너 노드를 스코어 기반 정렬.
+// 동점이면 (a) 페이지 하단에 가까운 노드 (b) 면적 큰 노드 우선.
 function _findButtonDescendant(node) {
   if (!node) return null;
   const candidates = [];
@@ -1863,18 +1909,24 @@ function _findButtonDescendant(node) {
     const cur = queue.shift();
     if (cur !== node) {  // 루트는 제외
       const nm = String(cur.name || "").toLowerCase().trim();
-      // 1순위: "button/small" 정확
-      // 2순위: "button/..." 으로 시작 (variant)
-      // 3순위: 단독 "button" 또는 "button "/tab 시작
       let score = 0;
+      // 정확 매치 우선
       if (nm === "button/small") score = 100;
-      else if (nm.indexOf("button/") === 0) score = 80;
-      else if (nm === "button") score = 60;
-      else if (nm.indexOf("button ") === 0 || nm.indexOf("button\t") === 0) score = 40;
-      else if (nm.indexOf("btn") === 0 || nm.indexOf("/btn") >= 0) score = 20;
-      if (score > 0 && (cur.type === "INSTANCE" || cur.type === "FRAME" ||
-                        cur.type === "COMPONENT" || cur.type === "RECTANGLE")) {
-        candidates.push({ score: score, node: cur });
+      else if (nm === "button/medium") score = 95;
+      else if (nm === "button/large") score = 90;
+      else if (nm.indexOf("button/") === 0) score = 80;   // variant
+      else if (nm === "button") score = 70;
+      else if (/(^|[^a-z])button([^a-z]|$)/.test(nm)) score = 50;  // 단어 경계
+      else if (/(^|[^a-z])btn([^a-z]|$)/.test(nm)) score = 30;
+      const typeOk = (cur.type === "INSTANCE" || cur.type === "FRAME" ||
+                      cur.type === "COMPONENT" || cur.type === "RECTANGLE");
+      if (score > 0 && typeOk) {
+        let area = 0, absY = 0;
+        try {
+          area = (cur.width || 0) * (cur.height || 0);
+          if (cur.absoluteTransform) absY = cur.absoluteTransform[1][2] || 0;
+        } catch (e) {}
+        candidates.push({ score: score, area: area, absY: absY, node: cur });
       }
     }
     if (cur.children && cur.children.length > 0) {
@@ -1882,7 +1934,11 @@ function _findButtonDescendant(node) {
     }
   }
   if (candidates.length === 0) return null;
-  candidates.sort(function (a, b) { return b.score - a.score; });
+  candidates.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.absY !== a.absY) return b.absY - a.absY;  // 아래쪽 우선
+    return b.area - a.area;
+  });
   return candidates[0].node;
 }
 

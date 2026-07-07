@@ -52,26 +52,38 @@
 
 ## 프롬프트 템플릿 (helper `IMAGE_PROMPT_TEMPLATES`)
 
-위치별로 별도의 프롬프트 템플릿을 쓴다. UI 의 `POSITION_STYLE_MAP` 이 position 값을 style key 로 매핑해서 `/generate-image` body 의 `style` 필드에 실어 보냄.
+위치별로 별도의 프롬프트 템플릿을 쓴다. UI 의 `POSITION_STYLE_MAP` 이 position 값을 style key 로 매핑해서 `/generate-image` body 의 `style` 필드에 실어 보냄. **모든 위치가 transparent 배경 (isolated subject) 로 생성 → pastel 은 프레임 배경 fill 로 별도 적용.**
 
 | Style key | 대상 위치 | 프롬프트 | 배경 |
 |---|---|---|---|
-| `3d-solid-pastel` | 홈 상단 · 생활편의 상단 | `Simple 3D illustration of {subject}, cute and minimal, no text, no letters, smooth matte plastic texture, solid pastel background, high quality, 3D render` | opaque (baked-in pastel) |
-| `2d-flat-solid` | 홈 중단 | `Flat design illustration of {subject}, no text, no letters, solid color fills only, no outline, no stroke, no line art, simple clean vector style` | opaque |
-| `3d` | 배너·팝업 (기존) | `Simple 3D illustration of {subject}, cute and minimal, no text, no letters, smooth matte plastic texture, isolated subject on transparent background, no shadow ground plane, high quality, 3D render` | transparent |
+| `3d` | 홈 상단 · 생활편의 상단 · 생활편의 하단 · 소통참여 하단 · 배너·팝업 | `Simple 3D illustration of {subject}, cute and minimal, no text, no letters, smooth matte plastic texture, isolated subject on transparent background, no shadow ground plane, high quality, 3D render` | transparent |
+| `2d-flat-solid` | 홈 중단 | `Flat design illustration of {subject}, no text, no letters, solid color fills only, no outline, no stroke, no line art, simple clean vector style` | transparent |
 | `photoreal` | 배너·팝업 실사 (기존) | (변경 없음) | transparent |
 | `illustration` | 배너·팝업 flat (기존) | (변경 없음) | transparent |
 | `ICON_3D_PROMPT` | 아이콘 3D 변환 (`/transform-icon`) | `smooth matte plastic texture, cute and minimal, 3D render` | transparent |
 
-### 자동 opaque 처리
+## 버튼 그라데이션 (`_derive_button_gradient_from_pastel`)
 
-`3d-solid-pastel` 은 프롬프트 자체가 solid background 를 요구해서 `client.images.generate` 호출 시 `background="transparent"` 를 붙이면 프롬프트와 충돌한다. helper 가 style 을 보고 자동으로 opaque 처리:
+기존 solid `_derive_button_from_pastel` 대신, Figma 참조 그라데이션 (node `137:5016`) 의 S/L 값을 유지하고 **hue 만 이미지의 dominant color 로 대체**한 좌→우 수평 그라데이션 생성.
 
-```python
-wants_transparent = req.transparent_background and req.style != "3d-solid-pastel"
-if wants_transparent:
-    gen_kwargs["background"] = "transparent"
+- 참조 gradient stop:
+  - start `#0fb7d5` (HSL 189° 87% 45%)
+  - end   `#0979b2` (HSL 200° 90% 37%)
+- 파생 결과: 두 stop 모두 `H = imageHue`, S/L 은 위 값 그대로 유지.
+
+응답 필드:
+```json
+{
+  "background_color": "#f9e0c3",
+  "button_color": "#e88f4a",              // solid (backward compat)
+  "button_gradient": {
+    "start": "#e8a04a",
+    "end":   "#c26612"
+  }
+}
 ```
+
+code.js 는 `buttonGradient` 가 있으면 `GRADIENT_LINEAR` fill 로 적용, 없으면 `button_color` solid 로 폴백.
 
 ## 홈 상단 (home-top) 흐름
 
@@ -85,11 +97,12 @@ if wants_transparent:
 
 ### Apply 결과
 
-`applyMode="addon-home-top"` 로 code.js 에 전달되면:
+`applyMode` 가 `addon-*` 계열 (`addon-home-top`, `addon-home-middle`, `addon-life-top`, `addon-life-bottom`, `addon-sotong-bottom`) 이면 아래가 모두 적용됨:
 1. **이미지**: 프레임 내 `name === "image"` descendant 를 우선 탐색 (없으면 root 제외 area picker). area picker 만 쓰면 외곽 프레임(`image_홈_...`) 이 걸려서 pastel 로 덮어써지는 버그가 있었음 — descendant 우선으로 해결.
-2. **버튼색**: `Button/small` descendant 를 BFS 로 탐색, 발견 시 SOLID fill 로 적용 (visible)
+2. **버튼 그라데이션**: `_findButtonDescendant` 로 fuzzy 매칭 (`Button/small`, `Button/medium`, `Button`, `Button/...`, `button *`, `btn*` 등). 발견 시 `GRADIENT_LINEAR` fill 을 적용 (좌→우, 두 stop 은 helper 가 파생한 `button_gradient`). `button_gradient` 없고 `button_color` 만 있으면 SOLID 로 폴백.
 3. **프레임 배경색**: 외곽 프레임 fill 을 SOLID pastel + `visible: false` 로 설정 (레이어 눈은 꺼짐)
 4. **프레임명**: 끝의 `_#RRGGBB` 를 새 hex 로 교체 (없으면 append). 예: `image_홈_배달서구_top_1080x528_#e1f3f9` → `..._#f8e2ec`
+5. **라이브러리 인스턴스 자동 detach**: `createAddonFromSpec` 이 라이브러리 컴포넌트로 새 인스턴스를 만들면 즉시 `detachInstance()` — main component sync 로 name/fills override 가 되돌려지는 위험 제거.
 
 ### 기획 셀 → 새 템플릿 자동 생성 (Smart dispatch)
 
@@ -171,6 +184,24 @@ if wants_transparent:
 1. 2D 아이콘 프레임 선택
 2. `아이콘` 선택 → `선택 프레임 3D 재변환`
 3. helper 가 `images.edit` 로 3D 렌더 → 같은 프레임에 fill 로 적용
+
+## PLATFORM-8 사내 라이브러리 매칭 (부가서비스 확장)
+
+배너·팝업에서 이미 쓰던 PLATFORM-8(`http://10.10.224.110:3000`) 매칭 흐름을 부가서비스에도 확장 (아이콘 position 제외).
+
+### 흐름
+1. **검색어** = 프레임명의 promotion 키워드 + 프레임 내 모든 텍스트 노드 (자동 조합, 한글 NFC/NFD 정규화)
+2. **부가서비스 프레임명 파싱** (`_plibExtractPromotion` 확장):
+   - `image_홈_{svc}_top_1080x528_#hex` → `{svc}` 추출
+   - `image_생활편의_{svc}_top_984x840` → `{svc}` 추출
+   - `banner_소통참여_{svc}_bottom_480x348` → `{svc}` 추출
+   - 끝에 붙는 hex 접미사 / 크기 토큰 / 위치 토큰 (`top`·`middle`·`bottom`) 자동 제거
+3. **스타일 → view 매핑**:
+   - `3d` → `3d`
+   - `2d-flat-solid` / `illustration` → `2d`
+   - `photoreal` / 기타 → `any`
+4. 매칭 결과 있으면 인라인 픽커 (썸네일 클릭 → 즉시 적용). 없으면 AI 생성 폴백.
+5. **부가서비스 apply 시**: PLATFORM-8 매칭 결과에도 `applyMode`, `buttonColor`, `buttonGradient` 를 전달해서 프레임 배경 hidden · 프레임명 rename · 버튼 그라데이션 채색까지 자동 실행 (helper `/promo-images/download` 응답에 `button_color`·`button_gradient` 포함).
 
 ## 향후 작업
 

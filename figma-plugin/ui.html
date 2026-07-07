@@ -1029,6 +1029,7 @@
       prompt: imageData.prompt || "",
       bgColor: imageData.background_color || null,
       buttonColor: imageData.button_color || null,
+      buttonGradient: imageData.button_gradient || null,
     };
     const box     = document.getElementById(kind + "-img-preview");
     const thumb   = document.getElementById(kind + "-img-preview-thumb");
@@ -1092,15 +1093,38 @@
       .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  // 프레임명 → promotion 키워드 추출 (팝업/배너만 대상, 소통참여는 미대상)
-  //   MMDD_popup_{promotion}_{w}x{h} → "{promotion}" (언더스코어는 공백으로)
+  // 프레임명 → promotion 키워드 추출.
+  // 팝업/배너 규칙 (기존): MMDD_popup_{promotion}_{w}x{h}
+  // 부가서비스 규칙: image_홈_{svc}_top_..., image_생활편의_{svc}_top_..., banner_소통참여_{svc}_bottom_...
+  //   → {svc} 를 promotion 으로 사용. 서비스명이 검색어의 핵심.
+  // 소통참여(사진) 프레임은 제외.
   function _plibExtractPromotion(frameName) {
     if (!frameName) return "";
     const parts = String(frameName).split("_");
     if (parts.length < 4) return "";
     const type = (parts[1] || "").toLowerCase();
-    if (type !== "popup" && type !== "banner") return "";
-    return parts.slice(2, -1).join(" ").trim();
+    // 기존 팝업/배너
+    if (type === "popup" || type === "banner") {
+      // banner_소통참여_... 는 부가서비스 규칙으로 별도 처리
+      if (parts[2] === "소통참여" && parts.length >= 5) {
+        return parts.slice(3, -1).join(" ").trim();
+      }
+      return parts.slice(2, -1).join(" ").trim();
+    }
+    // 부가서비스: image_홈_{svc}_top_..., image_생활편의_{svc}_top_...
+    if ((parts[0] === "image" || parts[0] === "banner") &&
+        (parts[1] === "홈" || parts[1] === "생활편의" || parts[1] === "소통참여")) {
+      // trailing _#hex 는 무시 (검색에 방해)
+      let end = parts.length;
+      if (/^#[0-9a-fA-F]{6}$/.test(parts[end - 1])) end -= 1;
+      // 크기 토큰 (예: 1080x528, 480x348, 984x840, 360x378, 1080) 도 무시
+      if (end > 2 && /^\d+(x\d+)?$/.test(parts[end - 1])) end -= 1;
+      // 위치 토큰 (top/middle/bottom) 무시
+      if (end > 2 && /^(top|middle|bottom)\d*$/i.test(parts[end - 1])) end -= 1;
+      // parts[2] 부터 end 전까지가 서비스명 후보
+      if (end > 2) return parts.slice(2, end).join(" ").trim();
+    }
+    return "";
   }
 
   function _plibResetViewButtons(view) {
@@ -1490,12 +1514,12 @@
     }
 
     // ── 위치별 프롬프트 스타일 매핑 ──
-    // 홈 상단 · 생활편의 상단 → "3d-solid-pastel" (배경까지 pastel 로 baked in)
-    // 홈 중단              → "2d-flat-solid"   (아이콘 그리드용 flat 벡터)
-    // 그 외                → 기본 "3d" (transparent 배경)
+    // 홈 상단 · 생활편의 상단 · life-bottom · sotong-bottom → "3d" (투명 배경, isolated subject)
+    //   → 프레임의 배경 pastel 은 dominant color 로 별도 적용 (배너 방식과 동일)
+    // 홈 중단              → "2d-flat-solid"   (아이콘 그리드용 flat 벡터, 투명)
     const POSITION_STYLE_MAP = {
-      "home-top":      "3d-solid-pastel",
-      "life-top":      "3d-solid-pastel",
+      "home-top":      "3d",
+      "life-top":      "3d",
       "home-middle":   "2d-flat-solid",
       "life-bottom":   "3d",
       "sotong-bottom": "3d",
@@ -1534,13 +1558,13 @@
     _imgGenStart("addon");
     if (isExistingTemplate) {
       _imgGenSetStage("이미지 자리 탐색 중…", position + " 템플릿 확인");
-      log("[부가서비스 " + position + "] 선택 프레임(" + selName + ")에서 이미지 생성 준비", "muted");
+      log("[부가서비스 " + position + "] 선택 프레임 = 기존 템플릿 (" + selName + ") → 이미지·색상만 갱신 (텍스트 유지)", "info");
       parent.postMessage({
         pluginMessage: { type: "image_generate_prepare", kind: applyKind, extraHint: feedback },
       }, "*");
     } else {
       _imgGenSetStage("기획 셀 → 새 템플릿 생성 중…", selName || "선택 프레임");
-      log("[부가서비스 " + position + "] 기획 셀에서 텍스트 추출 + 새 템플릿 생성 (등록 없으면 코드 내장 fallback)", "muted");
+      log("[부가서비스 " + position + "] 선택 프레임 = 기획 스펙 (" + (selName || "이름 없음") + ") → 새 템플릿 생성 + 텍스트 채움 + 이미지 생성", "info");
       _chainImageGenAfterApply = { kind: applyKind, extraHint: feedback, style: positionStyle };
       parent.postMessage({
         pluginMessage: { type: "addon_from_spec", position: position },
@@ -1698,6 +1722,7 @@
         frameNodeId: isSotong ? null : s.context.frameNodeId,
         backgroundColor: isSotong ? null : s.bgColor,
         buttonColor: isAddon ? s.buttonColor : null,
+        buttonGradient: isAddon ? s.buttonGradient : null,
         applyMode: isAddon ? (s.context.applyMode || s.context.kind || "addon-home-top") : null,
         base64: s.base64,
         prompt: s.prompt,
@@ -1917,7 +1942,8 @@
           (msg.removedName ? " (" + msg.removedName + ")" : ""), "ok");
       setBusy(false);
     } else if (msg.type === "addon_from_spec_done") {
-      log("✓ 기획 셀 → 새 템플릿 생성 완료: " + msg.newNodeName, "ok");
+      log("✓ 기획 셀 → 새 템플릿 생성 완료: " + msg.newNodeName +
+          " (source=" + (msg.templateSource || "?") + (msg.detached ? " · detached" : "") + ")", "ok");
       log("  · 텍스트 " + msg.texts_extracted + "개 추출 → " +
           msg.slots_filled + "/" + msg.slots_available + " 슬롯 채움", "info");
       if (msg.font_fallbacks && msg.font_fallbacks.length > 0)
@@ -1982,7 +2008,7 @@
       // 3D 스타일로 변환 → 결과를 미리보기 → image_generate_apply (applyMode=addon-icon).
       const pending = _imageGenPending || { kind: "addon", applyMode: "addon-icon" };
       if (!_imgGenActiveKind) _imgGenStart("addon");
-      log("  대상: " + msg.targetName + " (" + msg.width + "×" + msg.height + ")", "info");
+      log("  대상 노드: \"" + msg.targetName + "\" (" + msg.width + "×" + msg.height + "), frame=\"" + (msg.frameName || "?") + "\"", "info");
       _imgGenSetStage("아이콘 3D 변환 중…", "gpt-image-1 images.edit 호출");
       try {
         const startResp = await fetch(HELPER_BASE + "/transform-icon", {
@@ -2020,10 +2046,15 @@
       // msg 에 style/extraHint 를 같이 넣어 보내서 미리보기 재생성 시 ctx 로 활용
       msg.style = pending.style || "3d";
       msg.extraHint = pending.extraHint || null;
-      log("  대상: " + msg.targetName + " (" + msg.width + "×" + msg.height + ")", "info");
+      log("  대상 노드: \"" + msg.targetName + "\" (" + msg.width + "×" + msg.height + "), frame=\"" + (msg.frameName || "?") + "\"", "info");
 
-      // ─ PLATFORM-8 라이브러리 우선 시도 (팝업/배너만, 소통참여 제외) ─
-      const _plibKindOk = (pending.kind === "popup" || pending.kind === "banner");
+      // ─ PLATFORM-8 라이브러리 우선 시도 ─
+      // 팝업/배너, 그리고 부가서비스 addon-*(단, addon-icon 은 이미지 변환이라 매칭 부적합)
+      // 소통참여(sotong 실사 사진) 는 제외.
+      const _plibKindOk =
+        pending.kind === "popup" ||
+        pending.kind === "banner" ||
+        (String(pending.kind || "").indexOf("addon-") === 0 && pending.kind !== "addon-icon");
       // 검색어: 프레임명의 promotion + 프레임 내 텍스트 노드 전부
       const _plibFrameName = msg.frameName || msg.targetName || "";
       const _plibPromotion = _plibKindOk ? _plibExtractPromotion(_plibFrameName) : "";
@@ -2032,10 +2063,11 @@
         .filter(Boolean);
       const _plibQuery = [_plibPromotion, ..._plibTextTokens]
         .filter(Boolean).join(" ").trim();
-      // AI 스타일 dropdown 값을 라이브러리 view 필터로 매핑: 3d→3d, illustration→2d, photoreal/기타→any
+      // AI 스타일 dropdown 값을 라이브러리 view 필터로 매핑
+      // 3d / 3d-solid-pastel → 3d, illustration / 2d-flat-solid → 2d, photoreal/기타 → any
       const _plibInitialView =
-        pending.style === "3d" ? "3d" :
-        pending.style === "illustration" ? "2d" : "any";
+        (pending.style === "3d" || pending.style === "3d-solid-pastel") ? "3d" :
+        (pending.style === "illustration" || pending.style === "2d-flat-solid") ? "2d" : "any";
       let _plibHandled = false;
       if (_plibKindOk && _plibQuery) {
         _imgGenSetStage("PLATFORM-8 라이브러리 검색 중…", _plibQuery.slice(0, 40));
@@ -2076,12 +2108,17 @@
                   (dl.background_color ? " · pastel=" + dl.background_color : ""), "ok");
               // 미리보기 UI 건너뛰고 바로 프레임 fill — 사용자가 이미 썸네일로 확인함
               _imgGenSetStage("Figma 에 적용 중…", "이미지 fill + 프레임 배경 pastel");
+              // addon-* 케이스는 applyMode + buttonColor + buttonGradient 도 전달
+              const _plibIsAddon = String(pending.kind || "").indexOf("addon-") === 0;
               parent.postMessage({
                 pluginMessage: {
                   type: "image_generate_apply",
                   targetNodeId: msg.targetNodeId,
-                  frameNodeId: msg.frameNodeId,        // 프레임 배경에 pastel 적용
+                  frameNodeId: msg.frameNodeId,
                   backgroundColor: dl.background_color || null,
+                  buttonColor: _plibIsAddon ? (dl.button_color || null) : null,
+                  buttonGradient: _plibIsAddon ? (dl.button_gradient || null) : null,
+                  applyMode: _plibIsAddon ? pending.kind : null,
                   base64: dl.base64,
                   prompt: "[PLATFORM-8] " + (decision.item.subject || "") +
                           (decision.item.view ? " · " + decision.item.view : "") +
@@ -2154,6 +2191,14 @@
         }
         if (data.prompt) log("  ✓ 프롬프트: " + data.prompt.slice(0, 120) + (data.prompt.length > 120 ? "…" : ""), "muted");
         if (data.background_color) log("  ✓ dominant pastel: " + data.background_color, "muted");
+        if (data.button_color) log("  ✓ 파생 버튼색: " + data.button_color, "muted");
+        if (data.button_gradient && data.button_gradient.start)
+          log("  ✓ 파생 버튼 그라데이션: " + data.button_gradient.start + " → " + data.button_gradient.end, "muted");
+        // helper 재기동 안됐을 때 button_color 필드 자체가 없음 — 감지해서 경고
+        if (data.background_color && !data.button_color && msg && String(msg.kind || "").indexOf("addon-") === 0) {
+          log("  ⚠ helper 응답에 button_color 필드 없음 — helper 를 재기동해주세요 (`python helper/main.py` 다시 실행). " +
+              "3d-solid-pastel 프롬프트도 이 서버에 없으면 fallback '3d' 로 실행됩니다.", "warn");
+        }
         log("  ✓ 이미지 받음 (" + data.size + ") — 미리보기에서 [적용] 누르세요", "ok");
         // 적용 대신 미리보기 표시 — 사용자가 [적용]/[재생성]/[취소] 선택
         _showImgPreview(pending.kind, msg, data);

@@ -859,6 +859,36 @@ def _pick_gpt_image_size(w: int, h: int) -> str:
     return f"{best[0]}x{best[1]}"
 
 
+def _derive_button_gradient_from_pastel(pastel_hex: Optional[str]) -> Optional[dict]:
+    """
+    Pastel dominant color 의 hue 만 유지하고 S/L 은 참조 그라데이션(Figma 137:5016) 값 사용:
+      start: #0fb7d5 → H=189 S=87% L=45%
+      end  : #0979b2 → H=200 S=90% L=37%
+    두 stop 모두 이미지의 H 로 대체, S/L 는 위 값 그대로.
+    반환: {"start": "#RRGGBB", "end": "#RRGGBB"} 또는 None.
+    """
+    import colorsys
+    if not pastel_hex:
+        return None
+    m = re.fullmatch(r"#?([0-9a-fA-F]{6})", pastel_hex.strip())
+    if not m:
+        return None
+    hexstr = m.group(1)
+    r = int(hexstr[0:2], 16) / 255.0
+    g = int(hexstr[2:4], 16) / 255.0
+    b = int(hexstr[4:6], 16) / 255.0
+    h, _l, _s = colorsys.rgb_to_hls(r, g, b)
+    def _hex(hh: float, ss: float, ll: float) -> str:
+        rr, gg, bb = colorsys.hls_to_rgb(hh, ll, ss)
+        return "#{:02x}{:02x}{:02x}".format(
+            int(round(rr * 255)), int(round(gg * 255)), int(round(bb * 255))
+        )
+    return {
+        "start": _hex(h, 0.87, 0.45),
+        "end":   _hex(h, 0.90, 0.37),
+    }
+
+
 def _derive_button_from_pastel(pastel_hex: Optional[str],
                                l_target: float = 0.50,
                                s_min: float = 0.55) -> Optional[str]:
@@ -935,12 +965,6 @@ IMAGE_PROMPT_TEMPLATES = {
         "Simple 3D illustration of {subject}, cute and minimal, no text, no letters, "
         "smooth matte plastic texture, isolated subject on transparent background, "
         "no shadow ground plane, high quality, 3D render"
-    ),
-    # 부가서비스 [홈 상단 · 생활편의 상단] 전용 — 배경이 solid pastel 로 채워짐.
-    # dominant color 추출이 이 pastel 배경을 그대로 뽑아내서 프레임 배경·버튼색으로 사용.
-    "3d-solid-pastel": (
-        "Simple 3D illustration of {subject}, cute and minimal, no text, no letters, "
-        "smooth matte plastic texture, solid pastel background, high quality, 3D render"
     ),
     # 부가서비스 [홈 중단] 전용 — 아이콘 그리드용 flat 벡터.
     # "no text, no letters" 를 앞쪽에 두어 gpt-image-1 이 텍스트를 그리지 않도록.
@@ -1250,9 +1274,7 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             model="gpt-image-1", prompt=prompt, size=size, n=1,
             output_format="png",
         )
-        # 3d-solid-pastel 은 프롬프트가 solid pastel background 를 요구하므로 opaque 로 강제.
-        wants_transparent = req.transparent_background and req.style != "3d-solid-pastel"
-        if wants_transparent:
+        if req.transparent_background:
             gen_kwargs["background"] = "transparent"
         result = client.images.generate(**gen_kwargs)
         if not result.data:
@@ -1272,8 +1294,9 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             log.warning("[generate-image:%s] dominant color 단계 실패: %s", job_id, e)
             bg_color = None
         button_color = _derive_button_from_pastel(bg_color) if bg_color else None
-        log.info("[generate-image:%s] background_color=%s button_color=%s",
-                 job_id, bg_color, button_color)
+        button_gradient = _derive_button_gradient_from_pastel(bg_color) if bg_color else None
+        log.info("[generate-image:%s] background_color=%s button_color=%s button_gradient=%s",
+                 job_id, bg_color, button_color, button_gradient)
 
         with _IMAGE_JOBS_LOCK:
             j = _IMAGE_JOBS[job_id]
@@ -1283,6 +1306,7 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             j["size"] = size
             j["background_color"] = bg_color
             j["button_color"] = button_color
+            j["button_gradient"] = button_gradient
             j["finished_at"] = time.time()
     except Exception as e:
         log.exception("[generate-image:%s] 실패", job_id)
@@ -1421,6 +1445,7 @@ def generate_image_status(job_id: str):
             out["size"] = job.get("size")
             out["background_color"] = job.get("background_color")
             out["button_color"] = job.get("button_color")
+            out["button_gradient"] = job.get("button_gradient")
         elif job["status"] == "failed":
             out["error"] = job.get("error")
     return out
