@@ -429,6 +429,7 @@
       <button class="sub-tab-btn" data-sub="sub-popup">팝업</button>
       <button class="sub-tab-btn" data-sub="sub-detail">상세페이지</button>
       <button class="sub-tab-btn" data-sub="sub-sotong">소통참여</button>
+      <button class="sub-tab-btn" data-sub="sub-addon">부가서비스</button>
     </div>
     <div style="padding-top:10px;">
 
@@ -597,6 +598,63 @@
         </div>
       </div>
 
+      <!-- 부가서비스 -->
+      <div class="sub-tab-content" id="sub-addon">
+        <div class="card">
+          <label class="lbl">위치 (프레임 크기)</label>
+          <select id="addon-position" class="text-input" style="margin-bottom:8px;">
+            <option value="icon">아이콘 (48×48)</option>
+            <option value="home-top">홈 상단 (1080×528)</option>
+            <option value="home-middle">홈 중단 (360×378)</option>
+            <option value="life-top">생활편의 상단 (984×840)</option>
+            <option value="life-bottom">생활편의 하단 (1080×가변)</option>
+            <option value="sotong-bottom">소통참여 하단 (480×348)</option>
+          </select>
+
+          <label class="lbl">프롬프트 코멘트 (선택)</label>
+          <textarea class="text-input" id="addon-feedback" rows="2"
+            placeholder="예: 더 밝은 톤으로, 배경에 작은 카드 요소 추가"
+            style="resize:vertical;font-family:inherit;margin-bottom:8px;"></textarea>
+
+          <button id="addon-apply-image" class="btn-apply">적용 + 이미지 생성</button>
+          <button id="addon-apply" class="secondary" style="font-size:12px;padding:7px;margin-bottom:6px;">템플릿만 적용</button>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#444;">
+            <input type="checkbox" id="addon-skip-preview" style="width:auto;margin:0;" />
+            <label for="addon-skip-preview" style="cursor:pointer;margin:0;">미리보기 없이 바로 적용</label>
+          </div>
+
+          <div class="img-gen-status" id="addon-img-gen-status">
+            <span class="timer" id="addon-img-gen-timer">0s</span>
+            <span class="stage" id="addon-img-gen-stage">준비 중…</span>
+            <div class="substep" id="addon-img-gen-substep"></div>
+            <div class="bar"></div>
+          </div>
+          <div class="img-preview" id="addon-img-preview">
+            <div class="img-preview-title">미리보기 (적용 전)</div>
+            <img class="img-preview-thumb" id="addon-img-preview-thumb" alt="생성된 이미지" />
+            <div class="img-preview-meta">
+              <span class="bg-swatch" id="addon-img-preview-swatch"></span>
+              <span>배경: <span id="addon-img-preview-bgcolor">-</span></span>
+              <span class="bg-swatch" id="addon-img-preview-btnswatch" style="margin-left:6px;"></span>
+              <span>버튼: <span id="addon-img-preview-btncolor">-</span></span>
+            </div>
+            <div style="font-size:12px;color:#6a7689;margin-top:2px;">
+              (배경: pastel L 0.87~0.93 · 버튼: 같은 hue L 0.50)
+            </div>
+            <div class="img-preview-prompt" id="addon-img-preview-prompt"></div>
+            <label class="lbl" style="margin-top:6px;">재생성 코멘트 (선택)</label>
+            <textarea class="text-input" id="addon-img-preview-feedback" rows="2"
+              placeholder="예: 더 귀여운 캐릭터로, 배경 요소 단순화"
+              style="resize:vertical;font-family:inherit;margin-bottom:0;"></textarea>
+            <div class="img-preview-actions">
+              <button class="btn-apply" data-img-preview-apply="addon">적용</button>
+              <button class="secondary" data-img-preview-regen="addon">재생성</button>
+              <button class="btn-del" data-img-preview-cancel="addon">취소</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -625,6 +683,33 @@
         <button id="popup-register" class="btn-reg">+ 팝업 등록</button>
         <button id="popup-delete" class="btn-del">삭제</button>
       </div>
+    </div>
+
+    <div class="settings-section-title">부가서비스 템플릿</div>
+    <div class="card">
+      <details class="help">
+        <summary>사용 방법</summary>
+        <p class="hint">
+          위치별로 라이브러리 인스턴스 1개씩 등록. 지자체마다 서비스명만 다르고 프레임 규격은 같으므로 위치당 1 템플릿 재사용.<br/>
+          라이브러리 인스턴스 선택 → 위치 종류 선택 → [+ 등록]
+        </p>
+      </details>
+      <label class="lbl">위치 종류</label>
+      <select id="addon-tpl-type" class="text-input" style="margin-bottom:6px;">
+        <option value="icon">아이콘 (48×48)</option>
+        <option value="home-top">홈 상단 (1080×528)</option>
+        <option value="home-middle">홈 중단 (360×378)</option>
+        <option value="life-top">생활편의 상단 (984×840)</option>
+        <option value="life-bottom">생활편의 하단 (1080×가변)</option>
+        <option value="sotong-bottom">소통참여 하단 (480×348)</option>
+      </select>
+      <div class="btn-row" style="margin-bottom:6px;">
+        <button id="addon-tpl-add" class="btn-reg">+ 등록</button>
+        <button id="addon-tpl-del" class="btn-del">삭제</button>
+      </div>
+      <select id="addon-tpl-del-select" class="text-input" style="display:none;margin-bottom:0;">
+        <option value="">(삭제할 항목 선택)</option>
+      </select>
     </div>
 
     <div class="settings-section-title">상세페이지 섹션 템플릿</div>
@@ -943,11 +1028,14 @@
       base64: imageData.image_base64,
       prompt: imageData.prompt || "",
       bgColor: imageData.background_color || null,
+      buttonColor: imageData.button_color || null,
     };
     const box     = document.getElementById(kind + "-img-preview");
     const thumb   = document.getElementById(kind + "-img-preview-thumb");
     const swatch  = document.getElementById(kind + "-img-preview-swatch");
     const bgText  = document.getElementById(kind + "-img-preview-bgcolor");
+    const btnSwatch = document.getElementById(kind + "-img-preview-btnswatch");
+    const btnText   = document.getElementById(kind + "-img-preview-btncolor");
     const promptEl = document.getElementById(kind + "-img-preview-prompt");
     // 미리보기 스킵 토글 또는 일괄 처리 중이면 자동 적용
     const skip = _skipPreviewChecked(kind) || !!_batchState;
@@ -961,6 +1049,8 @@
     if (thumb) thumb.src = "data:image/png;base64," + imageData.image_base64;
     if (swatch) swatch.style.background = imageData.background_color || "transparent";
     if (bgText) bgText.textContent = imageData.background_color || "(없음)";
+    if (btnSwatch) btnSwatch.style.background = imageData.button_color || "transparent";
+    if (btnText) btnText.textContent = imageData.button_color || "(없음)";
     if (promptEl) promptEl.textContent = imageData.prompt || "(프롬프트 없음)";
     // 새 결과가 나왔으니 직전 피드백 입력 초기화
     const feedbackEl = document.getElementById(kind + "-img-preview-feedback");
@@ -980,7 +1070,7 @@
     parent.postMessage({ pluginMessage: { type: "ui_resize", width: 440, height: 800 } }, "*");
     if (!_imgPreviewState) {
       // 모든 kind 닫기 (safety)
-      ["popup", "banner", "sotong"].forEach(k => {
+      ["popup", "banner", "sotong", "addon"].forEach(k => {
         const b = document.getElementById(k + "-img-preview");
         if (b) b.classList.remove("active");
       });
@@ -1356,6 +1446,117 @@
   bannerApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("banner", bannerTypeSelect, bannerImgHintInput));
   popupApplyImageBtn.addEventListener("click", () => triggerApplyAndImage("popup", popupTypeSelect, popupImgHintInput));
 
+  // ── 부가서비스 (addon) 트리거 ──
+  const addonPositionSelect = document.getElementById("addon-position");
+  const addonFeedbackInput  = document.getElementById("addon-feedback");
+  const addonApplyImageBtn  = document.getElementById("addon-apply-image");
+
+  // position 변경 시 UI 토글: 아이콘 position 은 프레임 export → 3D 변환만.
+  function _updateAddonUiByPosition() {
+    if (!addonPositionSelect) return;
+    const isIcon = addonPositionSelect.value === "icon";
+    // "템플릿만 적용" 버튼 및 skip-preview 는 아이콘에선 무의미
+    const addonApplyOnly = document.getElementById("addon-apply");
+    const addonSkipPrev  = document.getElementById("addon-skip-preview");
+    if (addonApplyOnly) addonApplyOnly.style.display = isIcon ? "none" : "";
+    if (addonSkipPrev && addonSkipPrev.parentElement)
+      addonSkipPrev.parentElement.style.display = isIcon ? "none" : "";
+    // 메인 버튼 라벨
+    if (addonApplyImageBtn) addonApplyImageBtn.textContent = isIcon ? "선택 프레임 3D 재변환" : "적용 + 이미지 생성";
+  }
+  if (addonPositionSelect) {
+    addonPositionSelect.addEventListener("change", _updateAddonUiByPosition);
+    _updateAddonUiByPosition();  // 초기 반영
+  }
+
+  function _triggerAddonApplyImage() {
+    const position = addonPositionSelect ? addonPositionSelect.value : "home-top";
+    const feedback = (addonFeedbackInput && addonFeedbackInput.value || "").trim() || null;
+
+    // ── 아이콘: 프레임 export → /transform-icon ──
+    if (position === "icon") {
+      _imageGenPending = {
+        kind: "addon",
+        applyMode: "addon-icon",
+        extraHint: feedback,
+        style: "3d",
+      };
+      setBusy(true);
+      _imgGenStart("addon");
+      _imgGenSetStage("선택 프레임 export 중…", "PNG 변환");
+      log("[부가서비스 아이콘] 선택 프레임 → 3D 변환 요청", "muted");
+      parent.postMessage({ pluginMessage: { type: "icon_transform_prepare" } }, "*");
+      return;
+    }
+
+    // ── 홈 상단: 선택 프레임이 이미 홈 상단 템플릿(이름이 image_홈_ 로 시작)이면
+    //           바로 image_generate_prepare, 아니면 기획 셀로 판단 → addon_from_spec ──
+    if (position !== "home-top") {
+      log("✗ 현재는 [아이콘] 과 [홈 상단] 만 지원됩니다. 다른 위치는 추후 지원 예정.", "error");
+      return;
+    }
+    const selName = (_selectionInfo && _selectionInfo.frames && _selectionInfo.frames[0])
+      ? _selectionInfo.frames[0].name : "";
+    const isExistingTemplate = /^image_홈_.+_top_/.test(selName);
+
+    _imageGenPending = {
+      kind: "addon",
+      applyMode: "addon-home-top",
+      extraHint: feedback,
+      style: "3d",
+    };
+    setBusy(true);
+    _imgGenStart("addon");
+    if (isExistingTemplate) {
+      _imgGenSetStage("이미지 자리 탐색 중…", "홈 상단 템플릿 확인");
+      log("[부가서비스 홈 상단] 선택 프레임(" + selName + ")에서 이미지 생성 준비", "muted");
+      parent.postMessage({
+        pluginMessage: { type: "image_generate_prepare", kind: "addon-home-top", extraHint: feedback },
+      }, "*");
+    } else {
+      _imgGenSetStage("기획 셀 → 새 템플릿 생성 중…", selName || "선택 프레임");
+      log("[부가서비스 홈 상단] 기획 셀에서 텍스트 추출 + 새 템플릿 생성 (설정 탭 등록 템플릿 사용)", "muted");
+      // 이후 addon_from_spec_done 수신 시 image_generate_prepare 자동 체인
+      _chainImageGenAfterApply = { kind: "addon-home-top", extraHint: feedback, style: "3d" };
+      parent.postMessage({
+        pluginMessage: { type: "addon_from_spec", position: "home-top" },
+      }, "*");
+    }
+  }
+  if (addonApplyImageBtn) addonApplyImageBtn.addEventListener("click", _triggerAddonApplyImage);
+
+  // ── 설정 탭 · 부가서비스 템플릿 등록/삭제 ──
+  const addonTplTypeSelect = document.getElementById("addon-tpl-type");
+  const addonTplAddBtn     = document.getElementById("addon-tpl-add");
+  const addonTplDelBtn     = document.getElementById("addon-tpl-del");
+  let _addonRegisteredMap = {};   // { position: { name, key } }
+  function _addonPositionLabel(pos) {
+    const opt = addonPositionSelect && addonPositionSelect.querySelector('option[value="' + pos + '"]');
+    return opt ? opt.textContent : pos;
+  }
+  function _refreshAddonRegisteredList() {
+    // 콘솔 로그로 등록 현황 노출 (별도 UI 는 아직 없음)
+    const keys = Object.keys(_addonRegisteredMap || {});
+    if (keys.length === 0) {
+      log("등록된 부가서비스 템플릿: 없음", "muted");
+    } else {
+      log("등록된 부가서비스 템플릿:", "info");
+      keys.forEach(k => log("  · " + _addonPositionLabel(k) + " → " + (_addonRegisteredMap[k].name || ""), "muted"));
+    }
+  }
+  if (addonTplAddBtn) addonTplAddBtn.addEventListener("click", () => {
+    const pos = addonTplTypeSelect ? addonTplTypeSelect.value : "home-top";
+    setBusy(true);
+    parent.postMessage({ pluginMessage: { type: "addon_register", position: pos } }, "*");
+  });
+  if (addonTplDelBtn) addonTplDelBtn.addEventListener("click", () => {
+    const pos = addonTplTypeSelect ? addonTplTypeSelect.value : "home-top";
+    setBusy(true);
+    parent.postMessage({ pluginMessage: { type: "addon_delete", position: pos } }, "*");
+  });
+  // 플러그인 로드 시 등록 현황 요청
+  parent.postMessage({ pluginMessage: { type: "addon_get_templates" } }, "*");
+
   // ── 소통참여 (실사 사진) 트리거 ──
   function _triggerSotongFromSelection() {
     if (!_sotongSelectedInfo) {
@@ -1461,13 +1662,19 @@
     _imgGenStart(s.kind);
     // 소통참여는 프레임 자체가 이미지 대상 → pastel 배경 덮어쓰기 방지
     const isSotong = s.kind === "sotong";
-    _imgGenSetStage("Figma 에 적용 중…", isSotong ? "이미지 fill 설정" : "이미지 fill + 프레임 배경색 설정");
+    const isAddon = s.kind === "addon";
+    let stageSub = "이미지 fill 설정";
+    if (isAddon) stageSub = "이미지 + 버튼색 + 프레임명 갱신";
+    else if (!isSotong) stageSub = "이미지 fill + 프레임 배경색 설정";
+    _imgGenSetStage("Figma 에 적용 중…", stageSub);
     parent.postMessage({
       pluginMessage: {
         type: "image_generate_apply",
         targetNodeId: s.context.targetNodeId,
         frameNodeId: isSotong ? null : s.context.frameNodeId,
         backgroundColor: isSotong ? null : s.bgColor,
+        buttonColor: isAddon ? s.buttonColor : null,
+        applyMode: isAddon ? (s.context.applyMode || "addon-home-top") : null,
         base64: s.base64,
         prompt: s.prompt,
       },
@@ -1673,6 +1880,37 @@
       log("  ⚠ 일괄 처리 step 실패: " + (msg.message || ""), "warn");
       if (_batchState) _batchState.errors.push(msg.message || "(원인 미상)");
       _runNextBatchStep();
+    } else if (msg.type === "addon_templates_loaded") {
+      _addonRegisteredMap = msg.templates || {};
+      _refreshAddonRegisteredList();
+    } else if (msg.type === "addon_template_registered") {
+      _addonRegisteredMap = msg.templates || {};
+      log("✓ 부가서비스 템플릿 등록: [" + _addonPositionLabel(msg.position) + "] → " + msg.name, "ok");
+      setBusy(false);
+    } else if (msg.type === "addon_template_deleted") {
+      _addonRegisteredMap = msg.templates || {};
+      log("✓ 부가서비스 템플릿 삭제: [" + _addonPositionLabel(msg.position) + "]" +
+          (msg.removedName ? " (" + msg.removedName + ")" : ""), "ok");
+      setBusy(false);
+    } else if (msg.type === "addon_from_spec_done") {
+      log("✓ 기획 셀 → 새 템플릿 생성 완료: " + msg.newNodeName, "ok");
+      log("  · 텍스트 " + msg.texts_extracted + "개 추출 → " +
+          msg.slots_filled + "/" + msg.slots_available + " 슬롯 채움", "info");
+      if (msg.font_fallbacks && msg.font_fallbacks.length > 0)
+        msg.font_fallbacks.forEach(f => log("  ⚠ 폰트 fallback: " + f, "warn"));
+      // 이어서 이미지 생성 자동 트리거
+      if (_chainImageGenAfterApply) {
+        const chain = _chainImageGenAfterApply;
+        _chainImageGenAfterApply = null;
+        _imageGenPending = { kind: "addon", applyMode: "addon-home-top", extraHint: chain.extraHint, style: chain.style };
+        _imgGenSetStage("이미지 자리 탐색 중…", "생성된 새 템플릿에서 이미지 슬롯 확인");
+        parent.postMessage({
+          pluginMessage: { type: "image_generate_prepare", kind: chain.kind, extraHint: chain.extraHint },
+        }, "*");
+      } else {
+        setBusy(false);
+        _imgGenStop();
+      }
     } else if (msg.type === "popup_templates") {
       refreshPopupDropdowns(msg.templates);
     } else if (msg.type === "popup_register_done") {
@@ -1714,6 +1952,42 @@
         // busy 유지 — image_generate_done / _error 에서 해제됨
       } else {
         setBusy(false);
+      }
+    } else if (msg.type === "icon_transform_context") {
+      // code.js 가 export 한 PNG (base64) 를 helper /transform-icon 으로 보내서
+      // 3D 스타일로 변환 → 결과를 미리보기 → image_generate_apply (applyMode=addon-icon).
+      const pending = _imageGenPending || { kind: "addon", applyMode: "addon-icon" };
+      if (!_imgGenActiveKind) _imgGenStart("addon");
+      log("  대상: " + msg.targetName + " (" + msg.width + "×" + msg.height + ")", "info");
+      _imgGenSetStage("아이콘 3D 변환 중…", "gpt-image-1 images.edit 호출");
+      try {
+        const startResp = await fetch(HELPER_BASE + "/transform-icon", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_base64: msg.inputBase64,
+            feedback: pending.extraHint || null,
+          }),
+        });
+        if (!startResp.ok) {
+          log("✗ Helper 오류 " + startResp.status + ": " + await startResp.text(), "error");
+          _imgGenStop(); setBusy(false); _imageGenPending = null; return;
+        }
+        const startData = await startResp.json();
+        const jobId = startData.job_id;
+        if (!jobId) {
+          log("✗ Helper 응답에 job_id 가 없습니다.", "error");
+          _imgGenStop(); setBusy(false); _imageGenPending = null; return;
+        }
+        const data = await pollImageJob(jobId);
+        if (!data) { _imgGenStop(); setBusy(false); _imageGenPending = null; return; }
+        log("  ✓ 3D 변환 완료 (" + data.size + ") — 미리보기에서 [적용] 누르세요", "ok");
+        // ctx 에 applyMode 심어두면 _previewApply 가 그대로 전달
+        msg.applyMode = "addon-icon";
+        msg.style = "3d";
+        _showImgPreview("addon", msg, data);
+      } catch (e) {
+        log("✗ Helper 연결 실패: " + e.message, "error");
+        _imgGenStop(); setBusy(false); _imageGenPending = null;
       }
     } else if (msg.type === "image_generate_context") {
       // code.js 가 보낸 컨텍스트 → Helper /generate-image 비동기 job 시작 → polling
@@ -1872,6 +2146,12 @@
           log("  ⚠ 프레임 배경색 적용 실패: " + msg.frameBgApplied.slice(7), "warn");
         else
           log("  ✓ 프레임 배경색 적용: " + msg.frameBgApplied, "info");
+      }
+      if (msg.buttonColorApplied) {
+        log("  ✓ 버튼색 적용: " + msg.buttonColorApplied, "info");
+      }
+      if (msg.frameRenamedTo) {
+        log("  ✓ 프레임명 갱신: " + msg.frameRenamedFrom + " → " + msg.frameRenamedTo, "info");
       }
       _imageGenPending = null;
       if (_batchState) {

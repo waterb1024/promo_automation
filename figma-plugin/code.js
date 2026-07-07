@@ -1182,7 +1182,24 @@ function prepareImageGenerate(opts) {
     return;
   }
 
-  const target = _pickPrimaryImageHolder(root);
+  // addon-home-top: 외곽 프레임 이름이 image_홈_... 로 시작해서 area 기반 picker 에서
+  // 외곽이 이겨버리는 문제가 있음. 정확히 name="image" 인 descendant 를 우선.
+  let target = null;
+  if (opts.kind === "addon-home-top") {
+    target = _findDescendantByName(root, "image");
+    // 명시적 image 슬롯이 없으면 root 를 제외한 하위에서 area picker
+    if (!target && "children" in root) {
+      const candidates = [];
+      for (let i = 0; i < root.children.length; i++) {
+        _collectImageHolders(root.children[i], candidates);
+      }
+      candidates.sort(function (a, b) {
+        return (b.width * b.height) - (a.width * a.height);
+      });
+      if (candidates.length > 0) target = candidates[0];
+    }
+  }
+  if (!target) target = _pickPrimaryImageHolder(root);
   if (!target) {
     figma.ui.postMessage({
       type: "image_generate_error",
@@ -1219,6 +1236,202 @@ function prepareImageGenerate(opts) {
     texts: texts,
     kind: opts.kind || "popup",
     extraHint: opts.extraHint || null,
+  });
+}
+
+// ─────────── 부가서비스 템플릿 CRUD ───────────
+// 위치별로 라이브러리 인스턴스 하나씩 등록. Map { position: { name, key } }.
+const ADDON_TEMPLATES_STORAGE = "addon_templates";
+
+async function _getAddonTemplates() {
+  return (await figma.clientStorage.getAsync(ADDON_TEMPLATES_STORAGE)) || {};
+}
+
+async function _postAddonTemplates() {
+  const map = await _getAddonTemplates();
+  figma.ui.postMessage({ type: "addon_templates_loaded", templates: map });
+}
+
+async function registerAddonTemplate(position) {
+  if (!position) { postError("등록할 위치 종류가 지정되지 않았습니다."); return; }
+  const sel = figma.currentPage.selection;
+  if (sel.length !== 1 || sel[0].type !== "INSTANCE") {
+    postError("라이브러리 인스턴스 1개를 선택해주세요. (Assets → 컴포넌트 → 캔버스에 드래그 → 그 인스턴스를 선택)");
+    return;
+  }
+  try {
+    const main = await sel[0].getMainComponentAsync();
+    if (!main || !main.key) {
+      postError("컴포넌트 key 조회 실패 — 팀 라이브러리에 publish 되어 있는지 확인해주세요.");
+      return;
+    }
+    const map = await _getAddonTemplates();
+    map[position] = { name: main.name || "(이름 없음)", key: main.key, registered_at: Date.now() };
+    await figma.clientStorage.setAsync(ADDON_TEMPLATES_STORAGE, map);
+    figma.ui.postMessage({
+      type: "addon_template_registered",
+      position: position, name: main.name || "(이름 없음)",
+      key: main.key, templates: map,
+    });
+  } catch (e) {
+    postError("부가서비스 템플릿 등록 실패: " + (e && e.message ? e.message : String(e)));
+  }
+}
+
+async function deleteAddonTemplate(position) {
+  if (!position) { postError("삭제할 위치 종류가 없습니다."); return; }
+  const map = await _getAddonTemplates();
+  if (!map[position]) { postError("[" + position + "] 위치에 등록된 템플릿이 없습니다."); return; }
+  const removed = map[position];
+  delete map[position];
+  await figma.clientStorage.setAsync(ADDON_TEMPLATES_STORAGE, map);
+  figma.ui.postMessage({
+    type: "addon_template_deleted",
+    position: position, removedName: removed.name || "", templates: map,
+  });
+}
+
+// 기획 스펙 셀 → 같은 위치로 새 템플릿 생성
+// - 선택 프레임의 텍스트 노드를 top-down 으로 추출
+// - position 에 등록된 라이브러리 컴포넌트를 import → 인스턴스 생성
+// - 인스턴스를 선택 셀 우측(x + width + 24, 같은 y) 에 배치
+// - 인스턴스의 placeholder 텍스트 슬롯을 위→아래 순으로 채움
+// - 새 인스턴스를 selection 으로 설정해서 이어서 image_generate_prepare 가 그대로 동작
+async function createAddonFromSpec(position) {
+  if (!position) { postError("위치 종류가 지정되지 않았습니다."); return; }
+  const sel = figma.currentPage.selection;
+  if (sel.length !== 1) {
+    postError("기획 스펙 셀(프레임) 1개를 선택해주세요.");
+    return;
+  }
+  const specNode = sel[0];
+  if (!("children" in specNode)) {
+    postError("자식 노드를 가진 프레임을 선택해주세요. (현재: " + specNode.type + ")");
+    return;
+  }
+
+  // 텍스트 추출 (top-down, placeholder 제외)
+  const textNodes = [];
+  _collectTextNodes(specNode, textNodes);
+  textNodes.sort(function (a, b) {
+    const ay = _absY(a), by = _absY(b);
+    if (Math.abs(ay - by) > 4) return ay - by;
+    return _absX(a) - _absX(b);
+  });
+  const texts = [];
+  for (let i = 0; i < textNodes.length; i++) {
+    const s = String(textNodes[i].characters).trim();
+    if (!_isPlaceholderText(s)) texts.push(s);
+  }
+  if (texts.length === 0) {
+    postError("선택 프레임에서 텍스트를 찾지 못했습니다.");
+    return;
+  }
+
+  // 등록된 템플릿 조회
+  const map = await _getAddonTemplates();
+  const tpl = map[position];
+  if (!tpl || !tpl.key) {
+    postError("설정 탭 → 부가서비스 템플릿에서 [" + position + "] 위치를 먼저 등록해주세요.");
+    return;
+  }
+
+  // 컴포넌트 import + instance 생성
+  let comp;
+  try {
+    comp = await figma.importComponentByKeyAsync(tpl.key);
+  } catch (e) {
+    postError("템플릿 컴포넌트 import 실패: " + (e && e.message ? e.message : String(e)));
+    return;
+  }
+  const inst = comp.createInstance();
+  figma.currentPage.appendChild(inst);
+  inst.x = specNode.x + specNode.width + 24;
+  inst.y = specNode.y;
+
+  // 텍스트 슬롯 채움 (top-down 순서 매핑)
+  const slots = _collectPlaceholdersOrdered(inst);
+  const filled = Math.min(slots.length, texts.length);
+  const fontFallbacks = [];
+  for (let i = 0; i < filled; i++) {
+    try {
+      const res = await _setTextSafe(slots[i], texts[i]);
+      if (res && res.fallback) {
+        fontFallbacks.push(
+          slots[i].name + ": " + JSON.stringify(res.requested) + " → " + JSON.stringify(res.used)
+        );
+      }
+    } catch (e) {
+      // 개별 실패는 로그로만 남기고 계속
+      figma.ui.postMessage({
+        type: "log",
+        level: "warn",
+        message: "  ⚠ 슬롯 채우기 실패 [" + slots[i].name + "]: " + (e && e.message ? e.message : String(e)),
+      });
+    }
+  }
+
+  // 이후 이미지 생성 체인이 이 인스턴스를 대상으로 하도록 selection 갱신
+  figma.currentPage.selection = [inst];
+
+  figma.ui.postMessage({
+    type: "addon_from_spec_done",
+    position: position,
+    newNodeId: inst.id,
+    newNodeName: inst.name,
+    specNodeId: specNode.id,
+    texts_extracted: texts.length,
+    slots_available: slots.length,
+    slots_filled: filled,
+    font_fallbacks: fontFallbacks,
+    templateName: tpl.name,
+  });
+}
+
+// 부가서비스 [아이콘] position 전용:
+// 선택된 프레임 1개를 PNG 로 export → UI 에 base64 로 넘김.
+// UI 가 helper /transform-icon 호출 → 결과 PNG 를 image_generate_apply 로 되돌려서
+// 같은 프레임에 fill 로 적용. applyMode="addon-icon" 이면 bg/버튼/rename 은 skip.
+async function prepareIconTransform() {
+  const sel = figma.currentPage.selection || [];
+  if (sel.length !== 1) {
+    figma.ui.postMessage({
+      type: "image_generate_error",
+      message: "3D 변환할 아이콘 프레임 1개를 선택해주세요.",
+    });
+    return;
+  }
+  const target = sel[0];
+  if (target.type !== "FRAME" && target.type !== "INSTANCE" &&
+      target.type !== "COMPONENT" && target.type !== "RECTANGLE") {
+    figma.ui.postMessage({
+      type: "image_generate_error",
+      message: "FRAME / INSTANCE / RECTANGLE 을 선택해주세요. (현재: " + target.type + ")",
+    });
+    return;
+  }
+
+  let bytes;
+  try {
+    bytes = await target.exportAsync({ format: "PNG" });
+  } catch (e) {
+    figma.ui.postMessage({
+      type: "image_generate_error",
+      message: "PNG export 실패: " + (e && e.message ? e.message : String(e)),
+    });
+    return;
+  }
+  const b64 = figma.base64Encode(bytes);
+  figma.ui.postMessage({
+    type: "icon_transform_context",
+    targetNodeId: target.id,
+    frameNodeId: null,
+    targetName: target.name || "(이름 없음)",
+    frameName: target.name || "(이름 없음)",
+    width: Math.max(64, Math.round(target.width)),
+    height: Math.max(64, Math.round(target.height)),
+    inputBase64: b64,
+    kind: "addon",
   });
 }
 
@@ -1283,9 +1496,17 @@ async function applyGeneratedImage(msg) {
   }
 
   // 프레임 배경에 dominant-color pastel 적용 (helper 가 추출한 hex)
+  // applyMode="addon-home-top" 이면 배경 fill 은 visible:false 로 두고,
+  // 프레임명 끝의 _#hex 를 새 값으로 교체 + Button/small child 에 버튼 색 적용.
   let frameBgApplied = null;
+  let buttonColorApplied = null;
+  let frameRenamedFrom = null;
+  let frameRenamedTo = null;
   const frameNodeId = msg && msg.frameNodeId;
   const bgHex = msg && msg.backgroundColor;
+  const buttonHex = msg && msg.buttonColor;
+  const applyMode = msg && msg.applyMode;
+  const bgVisible = applyMode !== "addon-home-top";  // addon 홈 상단은 hidden
   if (frameNodeId && bgHex) {
     const rgb = _hexToRgbNormalized(bgHex);
     if (rgb) {
@@ -1297,11 +1518,34 @@ async function applyGeneratedImage(msg) {
           frameNode = figma.getNodeById(frameNodeId);
         }
         if (frameNode && "fills" in frameNode) {
-          frameNode.fills = [{ type: "SOLID", color: rgb }];
+          frameNode.fills = [{
+            type: "SOLID", color: rgb, visible: bgVisible,
+          }];
           frameBgApplied = bgHex;
         }
+        // addon 홈 상단: 프레임명 끝 _#hex 교체 (없으면 append)
+        if (frameNode && applyMode === "addon-home-top") {
+          const oldName = String(frameNode.name || "");
+          const newName = _replaceOrAppendHexSuffix(oldName, bgHex);
+          if (newName !== oldName) {
+            frameRenamedFrom = oldName;
+            frameNode.name = newName;
+            frameRenamedTo = newName;
+          }
+        }
+        // addon 홈 상단: Button/small child 에 버튼색 적용
+        if (frameNode && applyMode === "addon-home-top" && buttonHex) {
+          const btnRgb = _hexToRgbNormalized(buttonHex);
+          if (btnRgb) {
+            const btnNode = _findDescendantByName(frameNode, "Button/small");
+            if (btnNode && "fills" in btnNode) {
+              btnNode.fills = [{ type: "SOLID", color: btnRgb, visible: true }];
+              buttonColorApplied = buttonHex;
+            }
+          }
+        }
       } catch (e) {
-        // 배경 적용 실패는 치명적 아니므로 done 메시지에 경고만 실어 보냄
+        // 배경/버튼 적용 실패는 치명적 아니므로 done 메시지에 경고만 실어 보냄
         frameBgApplied = "ERROR: " + (e && e.message ? e.message : String(e));
       }
     }
@@ -1312,7 +1556,34 @@ async function applyGeneratedImage(msg) {
     targetName: node.name || "(이름 없음)",
     prompt: msg.prompt || null,
     frameBgApplied: frameBgApplied,
+    buttonColorApplied: buttonColorApplied,
+    frameRenamedFrom: frameRenamedFrom,
+    frameRenamedTo: frameRenamedTo,
   });
+}
+
+// 프레임명 끝의 "_#RRGGBB" 를 새 hex 로 교체. 없으면 append.
+function _replaceOrAppendHexSuffix(name, hex) {
+  const h = String(hex || "").trim().toLowerCase();
+  if (!/^#?[0-9a-f]{6}$/.test(h)) return name;
+  const norm = h.charAt(0) === "#" ? h : "#" + h;
+  const re = /_#[0-9a-fA-F]{6}$/;
+  if (re.test(name)) return name.replace(re, "_" + norm);
+  return name + "_" + norm;
+}
+
+// 이름이 정확히 일치하는 descendant 를 BFS 로 탐색.
+function _findDescendantByName(node, targetName) {
+  if (!node) return null;
+  const queue = [node];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur.name === targetName) return cur;
+    if (cur.children && cur.children.length > 0) {
+      for (let i = 0; i < cur.children.length; i++) queue.push(cur.children[i]);
+    }
+  }
+  return null;
 }
 
 // 텍스트 노드의 문자열을 안전하게 설정.
@@ -1439,6 +1710,39 @@ figma.ui.onmessage = async function (msg) {
         type: "image_generate_error",
         message: "이미지 생성 준비 오류: " + (e && e.message ? e.message : String(e)),
       });
+    }
+  } else if (msg.type === "icon_transform_prepare") {
+    try {
+      await prepareIconTransform();
+    } catch (e) {
+      figma.ui.postMessage({
+        type: "image_generate_error",
+        message: "아이콘 export 오류: " + (e && e.message ? e.message : String(e)),
+      });
+    }
+  } else if (msg.type === "addon_register") {
+    try {
+      await registerAddonTemplate(msg.position);
+    } catch (e) {
+      postError("부가서비스 템플릿 등록 오류: " + (e && e.message ? e.message : String(e)));
+    }
+  } else if (msg.type === "addon_delete") {
+    try {
+      await deleteAddonTemplate(msg.position);
+    } catch (e) {
+      postError("부가서비스 템플릿 삭제 오류: " + (e && e.message ? e.message : String(e)));
+    }
+  } else if (msg.type === "addon_get_templates") {
+    try {
+      await _postAddonTemplates();
+    } catch (e) {
+      postError("부가서비스 템플릿 조회 오류: " + (e && e.message ? e.message : String(e)));
+    }
+  } else if (msg.type === "addon_from_spec") {
+    try {
+      await createAddonFromSpec(msg.position);
+    } catch (e) {
+      postError("기획 셀 자동 생성 오류: " + (e && e.message ? e.message : String(e)));
     }
   } else if (msg.type === "sotong_prepare_selected") {
     try {

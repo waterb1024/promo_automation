@@ -126,6 +126,11 @@ class ImportPPTRequest(BaseModel):
     jira_key: str
 
 
+class TransformIconRequest(BaseModel):
+    image_base64: str = Field(..., description="원본 2D 아이콘 PNG (base64)")
+    feedback: Optional[str] = Field(None, description="추가 스타일 코멘트 (선택)")
+
+
 class GenerateImageRequest(BaseModel):
     texts: List[str] = Field(default_factory=list, description="팝업/배너의 텍스트들 (위→아래 순). 프롬프트 생성에 사용")
     width: int = Field(..., ge=64, le=4096, description="채울 사각형의 width (px)")
@@ -854,6 +859,34 @@ def _pick_gpt_image_size(w: int, h: int) -> str:
     return f"{best[0]}x{best[1]}"
 
 
+def _derive_button_from_pastel(pastel_hex: Optional[str],
+                               l_target: float = 0.50,
+                               s_min: float = 0.55) -> Optional[str]:
+    """
+    Pastel 배경색(_extract_dominant_color_pastel 결과)의 hue 를 유지하고
+    Lightness=l_target 로 낮춰서 버튼용 saturated hex 로 변환.
+    Saturation 이 s_min 미만이면 s_min 으로 끌어올린다 (파스텔이 지나치게
+    희미하면 버튼도 회색 톤이 되어버려서).
+    """
+    import colorsys
+    if not pastel_hex:
+        return None
+    m = re.fullmatch(r"#?([0-9a-fA-F]{6})", pastel_hex.strip())
+    if not m:
+        return None
+    hexstr = m.group(1)
+    r = int(hexstr[0:2], 16) / 255.0
+    g = int(hexstr[2:4], 16) / 255.0
+    b = int(hexstr[4:6], 16) / 255.0
+    h, _l, s = colorsys.rgb_to_hls(r, g, b)
+    s2 = max(s_min, s)
+    l2 = max(0.0, min(1.0, l_target))
+    r2, g2, b2 = colorsys.hls_to_rgb(h, l2, s2)
+    return "#{:02x}{:02x}{:02x}".format(
+        int(round(r2 * 255)), int(round(g2 * 255)), int(round(b2 * 255))
+    )
+
+
 def _extract_dominant_color_pastel(png_bytes: bytes,
                                    l_min: float = 0.87,
                                    l_max: float = 0.93) -> Optional[str]:
@@ -1216,13 +1249,16 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
         log.info("[generate-image:%s] 완료: %d bytes (base64)", job_id, len(b64))
 
         # dominant color (pastel L=87~93) 추출 — 프레임 배경색으로 사용
+        # + 같은 hue 의 saturated variant (L=0.50) 를 버튼색으로 파생
         try:
             png_bytes = base64.b64decode(b64, validate=True)
             bg_color = _extract_dominant_color_pastel(png_bytes)
         except Exception as e:
             log.warning("[generate-image:%s] dominant color 단계 실패: %s", job_id, e)
             bg_color = None
-        log.info("[generate-image:%s] background_color=%s", job_id, bg_color)
+        button_color = _derive_button_from_pastel(bg_color) if bg_color else None
+        log.info("[generate-image:%s] background_color=%s button_color=%s",
+                 job_id, bg_color, button_color)
 
         with _IMAGE_JOBS_LOCK:
             j = _IMAGE_JOBS[job_id]
@@ -1231,6 +1267,7 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             j["image_base64"] = b64
             j["size"] = size
             j["background_color"] = bg_color
+            j["button_color"] = button_color
             j["finished_at"] = time.time()
     except Exception as e:
         log.exception("[generate-image:%s] 실패", job_id)
@@ -1268,6 +1305,93 @@ def generate_image(req: GenerateImageRequest):
     return {"job_id": job_id, "status": "pending"}
 
 
+# ─────────── 아이콘 3D 변환 ───────────
+# 부가서비스 "아이콘" position 전용:
+# 사용자가 Figma 에서 선택한 프레임을 PNG 로 export → gpt-image-1 images.edit
+# 으로 3D 렌더 스타일로 재변환 → 같은 프레임에 다시 fill.
+# 프롬프트는 고정 (사용자 요청 문구 그대로) + feedback 만 append.
+ICON_3D_PROMPT = (
+    "Convert this 2D icon into a 3D icon with smooth matte plastic texture, "
+    "cute and minimal, 3D render style, isolated subject on transparent background, "
+    "no shadow ground plane, no text, no letters, keep the same subject and silhouette."
+)
+
+
+def _run_icon_transform_job(job_id: str, req: TransformIconRequest) -> None:
+    from openai import OpenAI
+
+    try:
+        prompt = ICON_3D_PROMPT
+        if req.feedback and req.feedback.strip():
+            prompt += ", user refinement request: " + req.feedback.strip()
+        log.info("[transform-icon:%s] 요청 (프롬프트 len=%d)", job_id, len(prompt))
+        with _IMAGE_JOBS_LOCK:
+            _IMAGE_JOBS[job_id]["status"] = "running"
+            _IMAGE_JOBS[job_id]["stage"] = "image_edit"
+            _IMAGE_JOBS[job_id]["prompt"] = prompt
+
+        try:
+            png_in = base64.b64decode(req.image_base64, validate=True)
+        except Exception as e:
+            raise RuntimeError(f"입력 image_base64 디코딩 실패: {e}")
+
+        client = OpenAI(api_key=CONFIG.openai_api_key)
+        # images.edit — 입력 이미지의 실루엣·주제를 유지하며 스타일만 변환
+        result = client.images.edit(
+            model="gpt-image-1",
+            image=("icon.png", png_in, "image/png"),
+            prompt=prompt,
+            size="1024x1024",
+            n=1,
+            background="transparent",
+        )
+        if not result.data:
+            raise RuntimeError("OpenAI 응답에 이미지 데이터가 없습니다.")
+        b64_out = getattr(result.data[0], "b64_json", None)
+        if not b64_out:
+            raise RuntimeError("OpenAI 응답에 b64_json 필드가 없습니다.")
+
+        log.info("[transform-icon:%s] 완료: %d bytes", job_id, len(b64_out))
+        with _IMAGE_JOBS_LOCK:
+            j = _IMAGE_JOBS[job_id]
+            j["status"] = "completed"
+            j["stage"] = "done"
+            j["image_base64"] = b64_out
+            j["size"] = "1024x1024"
+            # 아이콘은 색상 추출·버튼색 사용 안함
+            j["background_color"] = None
+            j["button_color"] = None
+            j["finished_at"] = time.time()
+    except Exception as e:
+        log.exception("[transform-icon:%s] 실패", job_id)
+        with _IMAGE_JOBS_LOCK:
+            j = _IMAGE_JOBS.get(job_id)
+            if j is not None:
+                j["status"] = "failed"
+                j["error"] = str(e)
+                j["finished_at"] = time.time()
+
+
+@app.post("/transform-icon")
+def transform_icon(req: TransformIconRequest):
+    if CONFIG is None or not CONFIG.openai_api_key:
+        raise HTTPException(
+            503,
+            "openai_api_key 가 config 에 없습니다. "
+            "~/.promo-export/config.json 에 \"openai_api_key\": \"sk-...\" 추가 후 Helper 재시작.",
+        )
+    job_id = uuid.uuid4().hex[:12]
+    with _IMAGE_JOBS_LOCK:
+        _gc_image_jobs()
+        _IMAGE_JOBS[job_id] = {
+            "status": "pending",
+            "stage": "queued",
+            "created_at": time.time(),
+        }
+    threading.Thread(target=_run_icon_transform_job, args=(job_id, req), daemon=True).start()
+    return {"job_id": job_id, "status": "pending"}
+
+
 @app.get("/generate-image/{job_id}")
 def generate_image_status(job_id: str):
     with _IMAGE_JOBS_LOCK:
@@ -1285,6 +1409,7 @@ def generate_image_status(job_id: str):
             out["image_base64"] = job.get("image_base64")
             out["size"] = job.get("size")
             out["background_color"] = job.get("background_color")
+            out["button_color"] = job.get("button_color")
         elif job["status"] == "failed":
             out["error"] = job.get("error")
     return out
