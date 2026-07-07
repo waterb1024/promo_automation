@@ -936,6 +936,19 @@ IMAGE_PROMPT_TEMPLATES = {
         "smooth matte plastic texture, isolated subject on transparent background, "
         "no shadow ground plane, high quality, 3D render"
     ),
+    # 부가서비스 [홈 상단 · 생활편의 상단] 전용 — 배경이 solid pastel 로 채워짐.
+    # dominant color 추출이 이 pastel 배경을 그대로 뽑아내서 프레임 배경·버튼색으로 사용.
+    "3d-solid-pastel": (
+        "Simple 3D illustration of {subject}, cute and minimal, no text, no letters, "
+        "smooth matte plastic texture, solid pastel background, high quality, 3D render"
+    ),
+    # 부가서비스 [홈 중단] 전용 — 아이콘 그리드용 flat 벡터.
+    # "no text, no letters" 를 앞쪽에 두어 gpt-image-1 이 텍스트를 그리지 않도록.
+    "2d-flat-solid": (
+        "Flat design illustration of {subject}, no text, no letters, "
+        "solid color fills only, no outline, no stroke, no line art, "
+        "simple clean vector style"
+    ),
     "photoreal": (
         "Photorealistic studio photograph of {subject}, soft natural lighting, "
         "isolated subject on transparent background, no text, no letters, no logo, "
@@ -1237,7 +1250,9 @@ def _run_image_job(job_id: str, req: GenerateImageRequest) -> None:
             model="gpt-image-1", prompt=prompt, size=size, n=1,
             output_format="png",
         )
-        if req.transparent_background:
+        # 3d-solid-pastel 은 프롬프트가 solid pastel background 를 요구하므로 opaque 로 강제.
+        wants_transparent = req.transparent_background and req.style != "3d-solid-pastel"
+        if wants_transparent:
             gen_kwargs["background"] = "transparent"
         result = client.images.generate(**gen_kwargs)
         if not result.data:
@@ -1310,11 +1325,7 @@ def generate_image(req: GenerateImageRequest):
 # 사용자가 Figma 에서 선택한 프레임을 PNG 로 export → gpt-image-1 images.edit
 # 으로 3D 렌더 스타일로 재변환 → 같은 프레임에 다시 fill.
 # 프롬프트는 고정 (사용자 요청 문구 그대로) + feedback 만 append.
-ICON_3D_PROMPT = (
-    "Convert this 2D icon into a 3D icon with smooth matte plastic texture, "
-    "cute and minimal, 3D render style, isolated subject on transparent background, "
-    "no shadow ground plane, no text, no letters, keep the same subject and silhouette."
-)
+ICON_3D_PROMPT = "smooth matte plastic texture, cute and minimal, 3D render"
 
 
 def _run_icon_transform_job(job_id: str, req: TransformIconRequest) -> None:

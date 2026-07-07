@@ -21,11 +21,34 @@
 
 위치별로 라이브러리 인스턴스 1개씩 등록. `clientStorage:addon_templates` 에 `{ position: { name, key, registered_at } }` 형태로 저장. 지자체마다 서비스명만 다르고 프레임 규격은 같아서 위치당 1 템플릿을 재사용.
 
+## 프롬프트 템플릿 (helper `IMAGE_PROMPT_TEMPLATES`)
+
+위치별로 별도의 프롬프트 템플릿을 쓴다. UI 의 `POSITION_STYLE_MAP` 이 position 값을 style key 로 매핑해서 `/generate-image` body 의 `style` 필드에 실어 보냄.
+
+| Style key | 대상 위치 | 프롬프트 | 배경 |
+|---|---|---|---|
+| `3d-solid-pastel` | 홈 상단 · 생활편의 상단 | `Simple 3D illustration of {subject}, cute and minimal, no text, no letters, smooth matte plastic texture, solid pastel background, high quality, 3D render` | opaque (baked-in pastel) |
+| `2d-flat-solid` | 홈 중단 | `Flat design illustration of {subject}, no text, no letters, solid color fills only, no outline, no stroke, no line art, simple clean vector style` | opaque |
+| `3d` | 배너·팝업 (기존) | `Simple 3D illustration of {subject}, cute and minimal, no text, no letters, smooth matte plastic texture, isolated subject on transparent background, no shadow ground plane, high quality, 3D render` | transparent |
+| `photoreal` | 배너·팝업 실사 (기존) | (변경 없음) | transparent |
+| `illustration` | 배너·팝업 flat (기존) | (변경 없음) | transparent |
+| `ICON_3D_PROMPT` | 아이콘 3D 변환 (`/transform-icon`) | `smooth matte plastic texture, cute and minimal, 3D render` | transparent |
+
+### 자동 opaque 처리
+
+`3d-solid-pastel` 은 프롬프트 자체가 solid background 를 요구해서 `client.images.generate` 호출 시 `background="transparent"` 를 붙이면 프롬프트와 충돌한다. helper 가 style 을 보고 자동으로 opaque 처리:
+
+```python
+wants_transparent = req.transparent_background and req.style != "3d-solid-pastel"
+if wants_transparent:
+    gen_kwargs["background"] = "transparent"
+```
+
 ## 홈 상단 (home-top) 흐름
 
 ### 이미지 생성 로직
 
-배너와 동일한 helper `/generate-image` 파이프라인 재사용. GPT-4o-mini 로 텍스트 → 영어 명사구 추출 → gpt-image-1 이 3D 스타일 PNG 생성 (`transparent_background=true`).
+배너와 동일한 helper `/generate-image` 파이프라인 재사용. GPT-4o-mini 로 텍스트 → 영어 명사구 추출 → gpt-image-1 이 위 표의 `3d-solid-pastel` 프롬프트로 PNG 생성 (opaque).
 
 생성 이미지에서 dominant color 를 추출해 두 값을 도출:
 - **배경색** (`background_color`): pastel — HSL Lightness clamp 0.87~0.93 (기존 `_extract_dominant_color_pastel`)
@@ -63,12 +86,10 @@
 3. UI 가 helper `/transform-icon` POST → 폴링 → 미리보기 → apply
 4. helper `_run_icon_transform_job`:
    ```
-   ICON_3D_PROMPT = "Convert this 2D icon into a 3D icon with smooth matte
-   plastic texture, cute and minimal, 3D render style, isolated subject on
-   transparent background, no shadow ground plane, no text, no letters,
-   keep the same subject and silhouette."
+   ICON_3D_PROMPT = "smooth matte plastic texture, cute and minimal, 3D render"
    ```
    - `client.images.edit(model="gpt-image-1", image=..., prompt=..., background="transparent")`
+   - `images.edit` 은 입력 이미지의 실루엣·주제를 그대로 유지하고 스타일만 재해석하므로 프롬프트는 스타일 지시만 담김
 5. `image_generate_apply` (applyMode 없음 · frameNodeId 없음) → code.js 는 target 노드 fill 만 교체. 배경·버튼·프레임명 처리 skip.
 
 ## Helper 확장 (`helper/main.py`)

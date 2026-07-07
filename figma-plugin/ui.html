@@ -1489,6 +1489,17 @@
       return;
     }
 
+    // ── 위치별 프롬프트 스타일 매핑 ──
+    // 홈 상단 · 생활편의 상단 → "3d-solid-pastel" (배경까지 pastel 로 baked in)
+    // 홈 중단              → "2d-flat-solid"   (아이콘 그리드용 flat 벡터)
+    // 그 외 (미구현 위치)   → 기본 "3d"
+    const POSITION_STYLE_MAP = {
+      "home-top": "3d-solid-pastel",
+      "life-top": "3d-solid-pastel",
+      "home-middle": "2d-flat-solid",
+    };
+    const positionStyle = POSITION_STYLE_MAP[position] || "3d";
+
     // ── 홈 상단: 선택 프레임이 이미 홈 상단 템플릿(이름이 image_홈_ 로 시작)이면
     //           바로 image_generate_prepare, 아니면 기획 셀로 판단 → addon_from_spec ──
     if (position !== "home-top") {
@@ -1503,7 +1514,7 @@
       kind: "addon",
       applyMode: "addon-home-top",
       extraHint: feedback,
-      style: "3d",
+      style: positionStyle,
     };
     setBusy(true);
     _imgGenStart("addon");
