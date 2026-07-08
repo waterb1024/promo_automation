@@ -861,10 +861,12 @@ def _pick_gpt_image_size(w: int, h: int) -> str:
 
 def _derive_button_gradient_from_pastel(pastel_hex: Optional[str]) -> Optional[dict]:
     """
-    Pastel dominant color 의 hue 만 유지하고 S/L 은 참조 그라데이션(Figma 137:5016) 값 사용:
-      start: #0fb7d5 → H=189 S=87% L=45%
-      end  : #0979b2 → H=200 S=90% L=37%
-    두 stop 모두 이미지의 H 로 대체, S/L 는 위 값 그대로.
+    Pastel dominant color 에서 버튼용 saturated 그라데이션 도출.
+    Figma 참조 148:5583 (지금 주문하기·장바구니 채우러 가기·챌린지 구경하기)의
+    (255,187,51→255,126,51 orange, 71,128,235→49,100,196 blue) 를 참고:
+      - hue 를 시작→끝 사이 소폭 이동 (+12°) 해서 gradient 감 살림
+      - L 은 0.50~0.42 로 완만한 어두워짐 (기존 0.45→0.37 은 너무 검게 빠져서 완화)
+      - S 는 0.85~0.90 유지해서 흰 텍스트 대비 확보
     반환: {"start": "#RRGGBB", "end": "#RRGGBB"} 또는 None.
     """
     import colorsys
@@ -878,14 +880,16 @@ def _derive_button_gradient_from_pastel(pastel_hex: Optional[str]) -> Optional[d
     g = int(hexstr[2:4], 16) / 255.0
     b = int(hexstr[4:6], 16) / 255.0
     h, _l, _s = colorsys.rgb_to_hls(r, g, b)
+    # hue 는 [0, 1) 순환. +12° = +0.0333.
+    h_end = (h + 12.0 / 360.0) % 1.0
     def _hex(hh: float, ss: float, ll: float) -> str:
         rr, gg, bb = colorsys.hls_to_rgb(hh, ll, ss)
         return "#{:02x}{:02x}{:02x}".format(
             int(round(rr * 255)), int(round(gg * 255)), int(round(bb * 255))
         )
     return {
-        "start": _hex(h, 0.87, 0.45),
-        "end":   _hex(h, 0.90, 0.37),
+        "start": _hex(h,     0.85, 0.50),
+        "end":   _hex(h_end, 0.90, 0.42),
     }
 
 

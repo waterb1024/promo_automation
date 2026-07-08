@@ -1282,6 +1282,10 @@ function _addonMkFrame(parent, opts) {
   f.fills = opts.fills === undefined ? [] : opts.fills;
   if (opts.cornerRadius !== undefined) f.cornerRadius = opts.cornerRadius;
   if (opts.clipsContent !== undefined) f.clipsContent = opts.clipsContent;
+  if (opts.visible === false) f.visible = false;
+  if (opts.opacity !== undefined) f.opacity = opts.opacity;
+  if (opts.strokes !== undefined) f.strokes = opts.strokes;
+  if (opts.strokeWeight !== undefined) f.strokeWeight = opts.strokeWeight;
   if (parent) parent.appendChild(f);
   return f;
 }
@@ -1355,6 +1359,9 @@ async function buildAddonHomeTop(opts) {
 }
 
 // 홈 중단 (360×378 → display 120×126)
+// Figma reference: 132:21489
+// 구조: bg(파스텔 카드, apply 시 dominant color 로 덮어써짐) 위에 아이콘(img/image),
+// 그 위에 하단 흰색 텍스트 카드(서브+메인 2줄).
 async function buildAddonHomeMiddle(opts) {
   opts = opts || {};
   const svc = opts.serviceName || "서비스명";
@@ -1363,53 +1370,135 @@ async function buildAddonHomeMiddle(opts) {
     width: 120, height: 126, fills: [],
   });
   figma.currentPage.appendChild(outer);
+  // 배경 파스텔 카드 — apply 시 이미지 dominant color 로 덮어써짐
   _addonMkFrame(outer, {
     name: "bg", x: 0, y: 6, width: 120, height: 120,
-    fills: _addonSolid("#f0f2f5"), cornerRadius: 12,
+    fills: _addonSolid("#d8e6ff"), cornerRadius: 12,
   });
-  _addonMkFrame(outer, { name: "image", x: 44, y: 14, width: 32, height: 32 });
-  const textFrame = _addonMkFrame(outer, { name: "text", x: 0, y: 46, width: 120, height: 80 });
+  // 아이콘 슬롯 (Figma 원본 img→image 중첩. name="image" descendant 를 apply 이미지 대상으로)
+  const img = _addonMkFrame(outer, { name: "img", x: 12, y: 3, width: 96, height: 52 });
+  _addonMkFrame(img, { name: "image", x: 0, y: 0, width: 96, height: 52 });
+  // 하단 흰색 텍스트 카드 (bg 위 오버레이)
+  // 서브/메인 텍스트는 hug 로 두고, 부모를 auto-layout(세로/가로 중앙)로 만들어
+  // 컨텐츠 폭에 맞춰 자연스럽게 중앙 정렬. 매우 긴 문구는 clipsContent=true 로 잘라줌.
+  const textFrame = _addonMkFrame(outer, {
+    name: "text", x: 0, y: 46, width: 120, height: 80,
+    fills: _addonSolid("#ffffff"), cornerRadius: 12, clipsContent: true,
+  });
+  textFrame.layoutMode = "VERTICAL";
+  textFrame.primaryAxisSizingMode = "FIXED";
+  textFrame.counterAxisSizingMode = "FIXED";
+  textFrame.primaryAxisAlignItems = "MIN";
+  textFrame.counterAxisAlignItems = "CENTER";
+  textFrame.paddingTop = 25;
+  textFrame.paddingBottom = 16;
+  textFrame.paddingLeft = 0;
+  textFrame.paddingRight = 0;
+  textFrame.itemSpacing = 1;
   await _addonMkText(textFrame, {
-    name: "TEXT", x: 7.5, y: 25, width: 105, height: 39,
-    characters: "", font: ADDON_FONT_REG, fontSize: 11, color: ADDON_DEFAULT_TEXT_HEX,
-    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+    name: "sub_text",
+    characters: "", font: ADDON_FONT_REG, fontSize: 13, lineHeight: 18,
+    color: ADDON_DEFAULT_SUB_TEXT_HEX,
+    textAutoResize: "WIDTH_AND_HEIGHT",
+  });
+  await _addonMkText(textFrame, {
+    name: "TEXT",
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, lineHeight: 20,
+    color: "#000000",
+    textAutoResize: "WIDTH_AND_HEIGHT",
   });
   return outer;
 }
 
 // 생활편의 상단 (984×840 → display 328×280)
+// Figma reference: 145:5421
+// 구조: 외곽 파스텔 카드(apply 시 dominant 로 덮어써짐) 안에 con(sub_tit + tit + area/image),
+// AD_IMG 배지(기본 hidden, 필요 시 사용자가 켬), 하단 gradient Button/small.
 async function buildAddonLifeTop(opts) {
   opts = opts || {};
   const svc = opts.serviceName || "서비스명";
   const outer = _addonMkFrame(null, {
     name: "image_생활편의_" + svc + "_top_984x840",
     width: 328, height: 280,
-    fills: _addonSolid("#ffffff"), cornerRadius: 12,
+    fills: _addonSolid("#def8fd"),  // 기본 파스텔, apply 시 dominant color 로 덮어써짐
   });
   figma.currentPage.appendChild(outer);
-  const inner  = _addonMkFrame(outer, { name: "content", x: 16, y: 16, width: 296, height: 196 });
-  const subTit = _addonMkFrame(inner, { name: "sub_tit", x: 0, y: 0, width: 296, height: 20 });
-  _addonMkFrame(subTit, { name: "icon_20", x: 0, y: 0, width: 20, height: 20 });
+
+  // Figma 148:5610 템플릿 그대로 유지 (사용자 지시 2026-07-08).
+  // 패딩 16, con 296×196, tit y=26 h=44, area y=78 h=118, image 220×118 중앙.
+  const con = _addonMkFrame(outer, {
+    name: "con", x: 16, y: 16, width: 296, height: 196,
+    clipsContent: true,
+  });
+
+  // sub_tit: 서비스 아이콘(20×20 rounded) + 서비스명 텍스트
+  const subTit = _addonMkFrame(con, { name: "sub_tit", x: 0, y: 0, width: 296, height: 20 });
+  _addonMkFrame(subTit, {
+    name: "service_icon", x: 0, y: 0, width: 20, height: 20,
+    fills: _addonSolid("#bfbfbf"), cornerRadius: 4,
+  });
   await _addonMkText(subTit, {
     name: "svc_name", x: 24, y: 1, width: 200, height: 18,
-    characters: svc, font: ADDON_FONT_SEMI, fontSize: 13, color: ADDON_DEFAULT_SUB_TEXT_HEX,
-    textAutoResize: "NONE",
+    characters: svc, font: ADDON_FONT_REG, fontSize: 12, lineHeight: 18,
+    color: "#4d4d4d", textAutoResize: "NONE",
   });
-  const body = _addonMkFrame(inner, { name: "body", x: 0, y: 26, width: 296, height: 44 });
-  await _addonMkText(body, {
+
+  // tit: 메인 타이틀 (2 lines 최대, center-aligned, 44 clip)
+  const tit = _addonMkFrame(con, {
+    name: "tit", x: 0, y: 26, width: 296, height: 44,
+    clipsContent: true,
+  });
+  await _addonMkText(tit, {
     name: "TEXT", x: 0, y: 0, width: 296, height: 44,
-    characters: "", font: ADDON_FONT_BOLD, fontSize: 16, color: ADDON_DEFAULT_TEXT_HEX,
-    textAutoResize: "NONE",
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 15, lineHeight: 22,
+    color: "#121212", textAlignHorizontal: "CENTER", textAutoResize: "NONE",
   });
-  _addonMkFrame(inner, { name: "image", x: 66, y: 78, width: 164, height: 118 });
+
+  // area: 이미지 슬롯 (Figma 원본 그대로). image 220×118 (1.86:1) — 소스 square 대비 wide.
+  // 이 aspect 는 FILL 시 상하 51px씩 잘리므로 apply 로직에서 life-top 은 FIT 로 렌더 →
+  // image 118×118 로 슬롯 안에 완전히 들어오고 좌우는 외곽 파스텔이 채움 (fitScaleModes 참조).
+  const area = _addonMkFrame(con, {
+    name: "area", x: 0, y: 78, width: 296, height: 118,
+    clipsContent: true,
+  });
+  _addonMkFrame(area, {
+    name: "image", x: 38, y: 0, width: 220, height: 118,
+  });
+
+  // AD_IMG: 광고 배지 SVG (사용자 제공 · 2026-07-08). 기본 hidden, 필요 시 visible 로 켬.
+  // AD 글자가 VECTOR path 로 들어가 있어 TEXT 노드가 없으므로 slot 매핑 대상 아님.
+  const AD_IMG_SVG = '<svg width="20" height="12" viewBox="0 0 20 12" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<g opacity="0.3">' +
+    '<rect x="0.5" y="0.5" width="19" height="11" rx="2.5" stroke="black"/>' +
+    '<path d="M12.8433 9.2834H10.7119V2.71704H12.9067C14.8431 2.71704 15.9949 3.94597 15.9995 5.99115C15.9949 8.04087 14.8431 9.2834 12.8433 9.2834ZM11.7096 8.41272H12.7888C14.2762 8.40819 15.0109 7.54205 15.0109 5.99115C15.0109 4.44479 14.2762 3.58772 12.8433 3.58772H11.7096V8.41272Z" fill="black"/>' +
+    '<path d="M5.06163 9.2834H4.00049L6.35857 2.71704H7.51041L9.87756 9.2834H8.81642L8.21783 7.55112H5.66022L5.06163 9.2834ZM5.94591 6.71672H7.92761L6.95716 3.91422H6.91182L5.94591 6.71672Z" fill="black"/>' +
+    '</g>' +
+    '</svg>';
+  const adImg = figma.createNodeFromSvg(AD_IMG_SVG);
+  adImg.name = "AD_IMG";
+  adImg.x = 292;
+  adImg.y = 200;
+  adImg.visible = false;
+  outer.appendChild(adImg);
+
+  // Button/small: 하단 CTA (기본 gradient #0fb7d5→#0979b2, apply 시 image hue 로 덮어써짐)
+  // gradient 방향은 code.js 의 apply-time 로직 (좌상→우하 대각선) 과 동일.
   const btn = _addonMkFrame(outer, {
     name: "Button/small", x: 16, y: 228, width: 296, height: 36,
-    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 6,
+    fills: [{
+      type: "GRADIENT_LINEAR",
+      gradientTransform: [[1, -0.18, 0], [0.18, 1, 0]],
+      gradientStops: [
+        { position: 0, color: { r: 15/255,  g: 183/255, b: 213/255, a: 1 } }, // #0fb7d5
+        { position: 1, color: { r: 9/255,   g: 121/255, b: 178/255, a: 1 } }, // #0979b2
+      ],
+    }],
+    cornerRadius: 8,
   });
   await _addonMkText(btn, {
     name: "TEXT", x: 0, y: 8, width: 296, height: 20,
-    characters: "", font: ADDON_FONT_SEMI, fontSize: 14, color: "#ffffff",
-    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 13, lineHeight: 20,
+    color: "#ffffff", textAlignHorizontal: "CENTER", textAutoResize: "NONE",
   });
   return outer;
 }
@@ -1440,14 +1529,24 @@ async function buildAddonLifeBottom(opts) {
   });
   const body = _addonMkFrame(outer, { name: "body", x: 0, y: 84, width: 360, height: 316 });
   _addonMkFrame(body, { name: "image", x: 32, y: 16, width: 296, height: 220 });
+  // Button/medium: 하단 CTA (기본 gradient #0fb7d5→#0979b2, apply 시 image hue 로 덮어써짐)
+  // 홈 상단 · 생활편의 하단 통일 스타일 (cornerRadius 8, Bold, 좌상→우하 대각선).
   const btn = _addonMkFrame(body, {
     name: "Button/medium", x: 16, y: 252, width: 328, height: 44,
-    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 6,
+    fills: [{
+      type: "GRADIENT_LINEAR",
+      gradientTransform: [[1, -0.18, 0], [0.18, 1, 0]],
+      gradientStops: [
+        { position: 0, color: { r: 15/255, g: 183/255, b: 213/255, a: 1 } }, // #0fb7d5
+        { position: 1, color: { r: 9/255,  g: 121/255, b: 178/255, a: 1 } }, // #0979b2
+      ],
+    }],
+    cornerRadius: 8,
   });
   await _addonMkText(btn, {
     name: "TEXT", x: 0, y: 12, width: 328, height: 20,
-    characters: "", font: ADDON_FONT_SEMI, fontSize: 14, color: "#ffffff",
-    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, lineHeight: 20,
+    color: "#ffffff", textAlignHorizontal: "CENTER", textAutoResize: "NONE",
   });
   return outer;
 }
@@ -1603,7 +1702,7 @@ async function deleteAddonTemplate(position) {
 // - 인스턴스를 선택 셀 우측(x + width + 24, 같은 y) 에 배치
 // - 인스턴스의 placeholder 텍스트 슬롯을 위→아래 순으로 채움
 // - 새 인스턴스를 selection 으로 설정해서 이어서 image_generate_prepare 가 그대로 동작
-async function createAddonFromSpec(position, nodeId) {
+async function createAddonFromSpec(position, nodeId, placement) {
   if (!position) { postError("위치 종류가 지정되지 않았습니다."); return; }
   let specNode = null;
   if (nodeId) {
@@ -1653,7 +1752,16 @@ async function createAddonFromSpec(position, nodeId) {
   let templateName = "";
   let templateSource = "";
   const detached = false;
-  const svcHint = _guessServiceNameFromTexts(texts) || "서비스명";
+  // svc name 후보를 texts 에서 추출 → svc_name 슬롯 (skip pattern 으로 slot filling 대상 제외)
+  // 에 이미 채워짐. 여기서 texts 배열에서도 제거해야 이후 slot 매핑에서 tit(메인 타이틀) 등
+  // 다른 슬롯을 중복 침범하지 않음. (2026-07-08 fix: 생활편의 상단에서 서비스명이 tit 로도
+  // 들어가 원본 카피가 밀리는 버그 원인)
+  const svcHintRaw = _guessServiceNameFromTexts(texts);
+  if (svcHintRaw) {
+    const svcIdx = texts.indexOf(svcHintRaw);
+    if (svcIdx >= 0) texts.splice(svcIdx, 1);
+  }
+  const svcHint = svcHintRaw || "서비스명";
   const built = await buildAddonTemplateByPosition(position, { serviceName: svcHint });
   if (!built) {
     postError("[" + position + "] 위치용 코드 내장 builder 를 찾지 못했습니다.");
@@ -1662,8 +1770,14 @@ async function createAddonFromSpec(position, nodeId) {
   inst = built;
   templateName = "(코드 내장) " + inst.name;
   templateSource = "code";
-  inst.x = specNode.x + specNode.width + 24;
-  inst.y = specNode.y;
+  if (placement && typeof placement.x === "number" && typeof placement.y === "number") {
+    // 배치 모드: UI 가 계산한 명시적 좌표 사용 (가로 50px 간격 정렬 등)
+    inst.x = placement.x;
+    inst.y = placement.y;
+  } else {
+    inst.x = specNode.x + specNode.width + 24;
+    inst.y = specNode.y;
+  }
 
   // 텍스트 슬롯 채움: 스펙 셀 텍스트를 top-down 순서대로 인스턴스 텍스트 노드에 덮어씀.
   // 라이브러리 인스턴스는 원본 문구가 이미 있고 (placeholder 로 잡히지 않음),
@@ -1814,9 +1928,15 @@ async function applyGeneratedImage(msg) {
   try {
     const bytes = figma.base64Decode(b64);
     const image = figma.createImage(bytes);
+    // 이미지 슬롯 종횡비가 소스(square) 와 크게 다른 위치는 FIT 로 렌더 → 상하 crop 방지.
+    // life-top(220×118, 1.86:1) → image 118×118 로 슬롯에 완전히 들어오고 좌우 51px 씩
+    // 여백은 외곽 파스텔 bg(apply 시 image dominant color 로 세팅)가 채움.
+    const applyModeStr = String((msg && msg.applyMode) || "");
+    const fitScaleModes = { "addon-life-top": true };
+    const scaleMode = fitScaleModes[applyModeStr] ? "FIT" : "FILL";
     node.fills = [{
       type: "IMAGE",
-      scaleMode: "FILL",
+      scaleMode: scaleMode,
       imageHash: image.hash,
     }];
   } catch (e) {
@@ -1838,9 +1958,12 @@ async function applyGeneratedImage(msg) {
   const bgHex = msg && msg.backgroundColor;
   const buttonHex = msg && msg.buttonColor;
   const applyMode = msg && msg.applyMode;
-  // addon-* 계열은 모두 bg fill 을 hidden 으로 저장 (baked-in pastel 이 이미지에 있으므로).
+  // addon-* 는 대개 outer 를 hidden 으로 두지만 (이미지에 baked-in pastel 이 있으므로),
+  // 외곽 프레임 자체가 파스텔 카드인 경우 (addon-life-top) 는 visible=true 로 유지.
+  // addon-home-middle 은 별도로 내부 "bg" descendant 에 pastel 을 얹으므로 아래에서 처리.
   const isAddonApply = String(applyMode || "").indexOf("addon-") === 0;
-  const bgVisible = !isAddonApply;
+  const outerVisibleAddons = { "addon-life-top": true };
+  const bgVisible = !isAddonApply || !!outerVisibleAddons[applyMode];
   if (frameNodeId && bgHex) {
     const rgb = _hexToRgbNormalized(bgHex);
     if (rgb) {
@@ -1851,14 +1974,31 @@ async function applyGeneratedImage(msg) {
         } else {
           frameNode = figma.getNodeById(frameNodeId);
         }
-        if (frameNode && "fills" in frameNode) {
-          frameNode.fills = [{
-            type: "SOLID", color: rgb, visible: bgVisible,
-          }];
-          frameBgApplied = bgHex;
+        // 홈 중단(addon-home-middle) 은 프레임 자체가 아니라 내부 "bg" descendant 카드에
+        // pastel 을 얹어야 함 (하단 흰색 텍스트 카드가 오버레이 되기 때문에 프레임 fill 은
+        // 어차피 안 보임). 다른 addon-* 는 외곽 프레임 hidden pastel 로 기존 동작 유지.
+        // support-bottom 등 다른 위치도 "bg" descendant 를 갖지만 (예: 아이콘 원형 bg)
+        // 그건 pastel 대상이 아니므로 홈 중단으로 한정.
+        let bgTarget = null;
+        let bgIsDescendant = false;
+        if (applyMode === "addon-home-middle" && frameNode && "children" in frameNode) {
+          bgTarget = _findDescendantByName(frameNode, "bg");
+          if (bgTarget && "fills" in bgTarget) bgIsDescendant = true;
+          else bgTarget = null;
         }
-        // addon-*: 프레임명 끝 _#hex 교체 (없으면 append)
-        if (frameNode && isAddonApply) {
+        if (!bgTarget && frameNode && "fills" in frameNode) bgTarget = frameNode;
+        if (bgTarget) {
+          bgTarget.fills = [{
+            type: "SOLID", color: rgb,
+            // bg descendant 는 실제로 보여야 하므로 항상 visible.
+            // 외곽 프레임 fallback 은 기존 로직대로 addon 이면 hidden.
+            visible: bgIsDescendant ? true : bgVisible,
+          }];
+          frameBgApplied = bgHex + (bgIsDescendant ? " (→ bg descendant)" : "");
+        }
+        // 프레임명 끝 _#hex 교체는 홈 상단(addon-home-top) 에만 적용.
+        // 다른 addon-* 는 이름에 hex 접미사 붙이지 않음 (사용자 지침 2026-07-08).
+        if (frameNode && applyMode === "addon-home-top") {
           const oldName = String(frameNode.name || "");
           const newName = _replaceOrAppendHexSuffix(oldName, bgHex);
           if (newName !== oldName) {
@@ -1880,8 +2020,9 @@ async function applyGeneratedImage(msg) {
                 if (s && e) {
                   btnNode.fills = [{
                     type: "GRADIENT_LINEAR",
-                    // 좌 → 우 수평 그라데이션 (Figma 참조 137:5016 과 동일)
-                    gradientTransform: [[1, 0, 0], [0, 1, 0]],
+                    // 좌상 → 우하 대각선(~10° 다운틸트). Figma 참조 148:5583 의
+                    // `linear-gradient(79.74deg, ...)` 형태.
+                    gradientTransform: [[1, -0.18, 0], [0.18, 1, 0]],
                     gradientStops: [
                       { position: 0, color: { r: s.r, g: s.g, b: s.b, a: 1 } },
                       { position: 1, color: { r: e.r, g: e.g, b: e.b, a: 1 } },
@@ -2157,7 +2298,7 @@ figma.ui.onmessage = async function (msg) {
     }
   } else if (msg.type === "addon_from_spec") {
     try {
-      await createAddonFromSpec(msg.position, msg.nodeId || null);
+      await createAddonFromSpec(msg.position, msg.nodeId || null, msg.placement || null);
     } catch (e) {
       postError("기획 셀 자동 생성 오류: " + (e && e.message ? e.message : String(e)));
     }
@@ -2371,11 +2512,20 @@ function _summarizeSelection() {
   const frames = [];
   for (const n of sel) {
     if (n.type === "FRAME" || n.type === "INSTANCE" || n.type === "COMPONENT") {
+      let absX = 0, absY = 0;
+      try {
+        if (n.absoluteTransform) {
+          absX = n.absoluteTransform[0][2] || 0;
+          absY = n.absoluteTransform[1][2] || 0;
+        }
+      } catch (e) {}
       frames.push({
         id: n.id,
         name: n.name || "(이름 없음)",
         width: Math.round(n.width || 0),
         height: Math.round(n.height || 0),
+        x: Math.round(absX),
+        y: Math.round(absY),
       });
     }
   }

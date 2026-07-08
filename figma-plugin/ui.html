@@ -577,7 +577,7 @@
       <!-- 부가서비스 -->
       <div class="sub-tab-content" id="sub-addon">
         <div class="card">
-          <label class="lbl">위치 (프레임 크기)</label>
+          <label class="lbl">위치</label>
           <select id="addon-position" class="text-input" style="margin-bottom:8px;">
             <option value="home-top">홈 상단 (1080×528)</option>
             <option value="home-middle">홈 중단 (360×378)</option>
@@ -636,6 +636,11 @@
           <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
             여러 프레임을 선택하면 크기로 위치를 자동 판별합니다.
           </p>
+          <label class="lbl">적용 범위</label>
+          <select id="addon-batch-mode" class="text-input" style="margin-bottom:6px;">
+            <option value="full">전체 (텍스트 + 이미지)</option>
+            <option value="text-only">텍스트만</option>
+          </select>
           <button id="addon-batch-apply" class="secondary" style="font-size:12px;padding:7px;background:#444;color:#fff;">일괄 적용 실행</button>
           <div class="img-gen-status" id="addon-batch-img-gen-status">
             <span class="timer" id="addon-batch-img-gen-timer">0s</span>
@@ -1004,52 +1009,44 @@
   let _imgGenTimerHandle = null;
   let _imgGenStartTs = null;
   let _imgGenActiveKind = null;
+  // 배치 진행 중이면 위치 카드의 상태박스는 건드리지 않고 배치 카드만 사용.
+  function _imgGenActivePrefix() {
+    return _addonBatchState ? "addon-batch" : _imgGenActiveKind;
+  }
   function _imgGenStart(kind) {
     _imgGenActiveKind = kind;
     _imgGenStartTs = Date.now();
-    const box = document.getElementById(kind + "-img-gen-status");
+    const prefix = _imgGenActivePrefix();
+    const box = document.getElementById(prefix + "-img-gen-status");
     if (box) box.classList.add("active");
-    // 부가서비스 일괄 적용 중이면 배치 카드의 상태 박스도 함께 활성화
-    if (_addonBatchState) {
-      const bBox = document.getElementById("addon-batch-img-gen-status");
-      if (bBox) bBox.classList.add("active");
-    }
     _imgGenSetStage("준비 중…", "");
     if (_imgGenTimerHandle) clearInterval(_imgGenTimerHandle);
     _imgGenTimerHandle = setInterval(() => {
       if (!_imgGenStartTs || !_imgGenActiveKind) return;
       const s = Math.floor((Date.now() - _imgGenStartTs) / 1000);
-      const t = document.getElementById(_imgGenActiveKind + "-img-gen-timer");
+      const t = document.getElementById(_imgGenActivePrefix() + "-img-gen-timer");
       if (t) t.textContent = s + "s";
-      const bt = document.getElementById("addon-batch-img-gen-timer");
-      if (bt) bt.textContent = s + "s";
     }, 500);
   }
   function _imgGenSetStage(stageText, substepText) {
     if (!_imgGenActiveKind) return;
-    const stageEl = document.getElementById(_imgGenActiveKind + "-img-gen-stage");
-    const subEl = document.getElementById(_imgGenActiveKind + "-img-gen-substep");
+    const prefix = _imgGenActivePrefix();
+    const stageEl = document.getElementById(prefix + "-img-gen-stage");
+    const subEl = document.getElementById(prefix + "-img-gen-substep");
     if (stageEl) stageEl.textContent = stageText;
     if (subEl) subEl.textContent = substepText || "";
-    const bBox = document.getElementById("addon-batch-img-gen-status");
-    if (bBox && bBox.classList.contains("active")) {
-      const bStage = document.getElementById("addon-batch-img-gen-stage");
-      const bSub = document.getElementById("addon-batch-img-gen-substep");
-      if (bStage) bStage.textContent = stageText;
-      if (bSub) bSub.textContent = substepText || "";
-    }
   }
   function _imgGenStop() {
     if (_imgGenTimerHandle) clearInterval(_imgGenTimerHandle);
     _imgGenTimerHandle = null;
     _imgGenStartTs = null;
-    if (_imgGenActiveKind) {
-      const box = document.getElementById(_imgGenActiveKind + "-img-gen-status");
-      if (box) box.classList.remove("active");
-    }
+    // 배치·위치 카드 두 박스 모두 정리 (batch 종료 직전 _addonBatchState 가 이미 null 이 됐을 수도 있음)
+    const boxes = [
+      _imgGenActiveKind ? document.getElementById(_imgGenActiveKind + "-img-gen-status") : null,
+      document.getElementById("addon-batch-img-gen-status"),
+    ];
+    for (const b of boxes) { if (b) b.classList.remove("active"); }
     _imgGenActiveKind = null;
-    const bBox = document.getElementById("addon-batch-img-gen-status");
-    if (bBox) bBox.classList.remove("active");
   }
 
   // ── 이미지 미리보기 (적용 전 확인) ──
@@ -1515,6 +1512,34 @@
   const addonFeedbackInput  = document.getElementById("addon-feedback");
   const addonApplyImageBtn  = document.getElementById("addon-apply-image");
 
+  // 부가서비스 위치별 매핑 — 단일 트리거·일괄 트리거 양쪽에서 참조.
+  // 홈 상단 · 생활편의 상단·하단 · sotong-bottom → "3d" (투명 배경, isolated subject)
+  // 홈 중단 · 지원금혜택 하단 → "2d-flat-solid" (아이콘용 flat 벡터, 투명)
+  const POSITION_STYLE_MAP = {
+    "home-top":       "3d",
+    "life-top":       "3d",
+    "home-middle":    "2d-flat-solid",
+    "life-bottom":    "3d",
+    "support-bottom": "2d-flat-solid",
+    "sotong-bottom":  "3d",
+  };
+  const POSITION_KIND_MAP = {
+    "home-top":       "addon-home-top",
+    "home-middle":    "addon-home-middle",
+    "life-top":       "addon-life-top",
+    "life-bottom":    "addon-life-bottom",
+    "support-bottom": "addon-support-bottom",
+    "sotong-bottom":  "addon-sotong-bottom",
+  };
+  const POSITION_EXISTING_RE = {
+    "home-top":       /^image_홈_.+_top_/,
+    "home-middle":    /^image_홈_.+_middle_/,
+    "life-top":       /^image_생활편의_.+_top_/,
+    "life-bottom":    /^image_생활편의_.+_bottom_/,
+    "support-bottom": /^image_지원금혜택_.+_bottom_/,
+    "sotong-bottom":  /^banner_소통참여_.+_bottom_/,
+  };
+
   // position 변경 시 UI 토글: 아이콘 position 은 프레임 export → 3D 변환만.
   function _updateAddonUiByPosition() {
     if (!addonPositionSelect) return;
@@ -1553,36 +1578,6 @@
       return;
     }
 
-    // ── 위치별 프롬프트 스타일 매핑 ──
-    // 홈 상단 · 생활편의 상단 · life-bottom · sotong-bottom → "3d" (투명 배경, isolated subject)
-    //   → 프레임의 배경 pastel 은 dominant color 로 별도 적용 (배너 방식과 동일)
-    // 홈 중단              → "2d-flat-solid"   (아이콘 그리드용 flat 벡터, 투명)
-    const POSITION_STYLE_MAP = {
-      "home-top":       "3d",
-      "life-top":       "3d",
-      "home-middle":    "2d-flat-solid",
-      "life-bottom":    "3d",
-      "support-bottom": "2d-flat-solid",
-      "sotong-bottom":  "3d",
-    };
-    // 위치별 apply kind — code.js 의 target picker/branch 가 이 값을 씀
-    const POSITION_KIND_MAP = {
-      "home-top":       "addon-home-top",
-      "home-middle":    "addon-home-middle",
-      "life-top":       "addon-life-top",
-      "life-bottom":    "addon-life-bottom",
-      "support-bottom": "addon-support-bottom",
-      "sotong-bottom":  "addon-sotong-bottom",
-    };
-    // 위치별 selection 이 이미 해당 템플릿 인스턴스인지 판단하는 정규식
-    const POSITION_EXISTING_RE = {
-      "home-top":       /^image_홈_.+_top_/,
-      "home-middle":    /^image_홈_.+_middle_/,
-      "life-top":       /^image_생활편의_.+_top_/,
-      "life-bottom":    /^image_생활편의_.+_bottom_/,
-      "support-bottom": /^image_지원금혜택_.+_bottom_/,
-      "sotong-bottom":  /^banner_소통참여_.+_bottom_/,
-    };
     const positionStyle = POSITION_STYLE_MAP[position] || "3d";
     const applyKind     = POSITION_KIND_MAP[position]  || "addon-home-top";
     const existingRe    = POSITION_EXISTING_RE[position];
@@ -1649,6 +1644,8 @@
       return;
     }
     const feedback = (addonFeedbackInput && addonFeedbackInput.value || "").trim() || null;
+    const batchModeSelect = document.getElementById("addon-batch-mode");
+    const textOnly = !!(batchModeSelect && batchModeSelect.value === "text-only");
     const items = [];
     const skipped = [];
     for (const f of frames) {
@@ -1678,11 +1675,30 @@
       return;
     }
     log("일괄 적용 시작 — 매핑 " + items.length + "개" +
-        (skipped.length > 0 ? ", 스킵 " + skipped.length + "개" : ""), "info");
+        (skipped.length > 0 ? ", 스킵 " + skipped.length + "개" : "") +
+        " · 모드: " + (textOnly ? "텍스트만" : "전체(텍스트+이미지)"), "info");
     for (const it of items) log("  ✓ " + it.name + " → " + it.label, "muted");
     for (const s of skipped) log("  ✗ 스킵: " + s.name + " (" + s.w + "×" + s.h + ") — " + s.reason, "muted");
 
-    _addonBatchState = { items: items, idx: 0, errors: [], extraHint: feedback };
+    // ── 배치 좌표 계산 ──
+    // 모든 스펙 프레임의 하단(max y+h) + 50 위치에 가로로 나열, 가로 간격 50px.
+    // 시작 x = 스펙 프레임들의 최소 x (좌측 정렬).
+    const GENERATED_WIDTHS = {
+      "home-top": 360, "home-middle": 120, "life-top": 328,
+      "life-bottom": 360, "support-bottom": 350, "sotong-bottom": 160,
+    };
+    const specFrames = items.map(it => frames.find(f => f.id === it.nodeId)).filter(Boolean);
+    const startX = Math.min.apply(null, specFrames.map(f => f.x || 0));
+    const bottomY = Math.max.apply(null, specFrames.map(f => (f.y || 0) + (f.height || 0)));
+    const rowY = bottomY + 50;
+    let cursorX = startX;
+    for (const it of items) {
+      const w = GENERATED_WIDTHS[it.position] || 300;
+      it.placement = { x: cursorX, y: rowY };
+      cursorX += w + 50;
+    }
+
+    _addonBatchState = { items: items, idx: 0, errors: [], extraHint: feedback, textOnly: textOnly };
     _setAddonBatchBtnRunning(true, "일괄 적용 진행 중…");
     setBusy(true);
     _imgGenStart("addon");
@@ -1722,15 +1738,28 @@
     }
     const cur = b.items[b.idx];
     b.idx++;
-    _imgGenSetStage("일괄 " + b.idx + "/" + b.items.length + " · " + cur.label, cur.name);
+    const stagePrefix = b.textOnly ? "일괄(텍스트만) " : "일괄 ";
+    _imgGenSetStage(stagePrefix + b.idx + "/" + b.items.length + " · " + cur.label, cur.name);
     log("  [" + b.idx + "/" + b.items.length + "] " + cur.name + " → " + cur.label, "muted");
-    _imageGenPending = {
-      kind: "addon", applyMode: cur.applyKind,
-      extraHint: b.extraHint, style: cur.positionStyle,
-    };
-    _chainImageGenAfterApply = { kind: cur.applyKind, extraHint: b.extraHint, style: cur.positionStyle };
+    if (b.textOnly) {
+      // 텍스트만 모드: 이미지 생성 체인을 걸지 않음 → addon_from_spec_done 에서
+      // _chainImageGenAfterApply 가 null 이므로 곧바로 _runNextAddonBatchStep 로 이어짐.
+      _imageGenPending = null;
+      _chainImageGenAfterApply = null;
+    } else {
+      _imageGenPending = {
+        kind: "addon", applyMode: cur.applyKind,
+        extraHint: b.extraHint, style: cur.positionStyle,
+      };
+      _chainImageGenAfterApply = { kind: cur.applyKind, extraHint: b.extraHint, style: cur.positionStyle };
+    }
     parent.postMessage({
-      pluginMessage: { type: "addon_from_spec", position: cur.position, nodeId: cur.nodeId },
+      pluginMessage: {
+        type: "addon_from_spec",
+        position: cur.position,
+        nodeId: cur.nodeId,
+        placement: cur.placement || null,
+      },
     }, "*");
   }
 
@@ -2259,13 +2288,20 @@
         }
         if (_plibItems.length > 0) {
           log("  · PLATFORM-8 매칭 " + _plibItems.length + "개 발견 (검색어: " + _plibQuery + ", view=" + _plibInitialView + ")", "muted");
-          _imgGenStop();
-          const decision = await _openPromoLibPicker(
-            pending.kind,
-            _plibQuery,
-            '프레임 "' + _plibFrameName + '" + 본문 텍스트로 검색. 썸네일 클릭 시 바로 적용됩니다.',
-            _plibInitialView
-          );
+          // 배치 모드: 픽커 스킵하고 첫 번째 아이템 자동 선택
+          let decision;
+          if (_addonBatchState) {
+            log("  · 배치 모드 — 첫 번째 매칭 자동 선택: " + (_plibItems[0].subject || ""), "muted");
+            decision = { kind: "applied", item: _plibItems[0] };
+          } else {
+            _imgGenStop();
+            decision = await _openPromoLibPicker(
+              pending.kind,
+              _plibQuery,
+              '프레임 "' + _plibFrameName + '" + 본문 텍스트로 검색. 썸네일 클릭 시 바로 적용됩니다.',
+              _plibInitialView
+            );
+          }
           if (decision.kind === "cancel") {
             log("  · PLATFORM-8 선택 취소 — 이미지 생성 중단", "muted");
             setBusy(false); _imageGenPending = null;
