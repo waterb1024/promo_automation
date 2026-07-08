@@ -1411,7 +1411,7 @@ async function buildAddonHomeMiddle(opts) {
 }
 
 // 생활편의 상단 (984×840 → display 328×280)
-// Figma reference: 145:5421
+// Figma reference: 148:5700
 // 구조: 외곽 파스텔 카드(apply 시 dominant 로 덮어써짐) 안에 con(sub_tit + tit + area/image),
 // AD_IMG 배지(기본 hidden, 필요 시 사용자가 켬), 하단 gradient Button/small.
 async function buildAddonLifeTop(opts) {
@@ -1424,10 +1424,12 @@ async function buildAddonLifeTop(opts) {
   });
   figma.currentPage.appendChild(outer);
 
-  // Figma 148:5610 템플릿 그대로 유지 (사용자 지시 2026-07-08).
-  // 패딩 16, con 296×196, tit y=26 h=44, area y=78 h=118, image 220×118 중앙.
+  // Figma 148:5700 템플릿과 완전 일치. 패딩 16 유지 + con-button 간격 최소화(4px)로
+  // 이미지 슬롯 높이 138 확보. 220×138 (aspect 1.594) 에 대해 helper 는 3:2 (1536×1024)
+  // AI 이미지를 요청 → FIT 렌더 시 207×138 (슬롯 폭의 94%) 로 표시되어 잘림 없이 최대 크기.
+  // (이전 220×118 대비 표시 면적 +53% 증가)
   const con = _addonMkFrame(outer, {
-    name: "con", x: 16, y: 16, width: 296, height: 196,
+    name: "con", x: 16, y: 16, width: 296, height: 208,
     clipsContent: true,
   });
 
@@ -1443,9 +1445,9 @@ async function buildAddonLifeTop(opts) {
     color: "#4d4d4d", textAutoResize: "NONE",
   });
 
-  // tit: 메인 타이틀 (2 lines 최대, center-aligned, 44 clip)
+  // tit: 메인 타이틀 (2 lines 최대, center-aligned, 44 clip). Figma: y=22, gap 2.
   const tit = _addonMkFrame(con, {
-    name: "tit", x: 0, y: 26, width: 296, height: 44,
+    name: "tit", x: 0, y: 22, width: 296, height: 44,
     clipsContent: true,
   });
   await _addonMkText(tit, {
@@ -1454,15 +1456,14 @@ async function buildAddonLifeTop(opts) {
     color: "#121212", textAlignHorizontal: "CENTER", textAutoResize: "NONE",
   });
 
-  // area: 이미지 슬롯 (Figma 원본 그대로). image 220×118 (1.86:1) — 소스 square 대비 wide.
-  // 이 aspect 는 FILL 시 상하 51px씩 잘리므로 apply 로직에서 life-top 은 FIT 로 렌더 →
-  // image 118×118 로 슬롯 안에 완전히 들어오고 좌우는 외곽 파스텔이 채움 (fitScaleModes 참조).
+  // area: 이미지 슬롯. Figma: y=70 h=138, image 220×138 중앙(x=38).
+  // life-top 은 fitScaleModes 로 FIT 렌더 → 소스 종횡비 유지, 잘림 없이 슬롯 내 최대 크기.
   const area = _addonMkFrame(con, {
-    name: "area", x: 0, y: 78, width: 296, height: 118,
+    name: "area", x: 0, y: 70, width: 296, height: 138,
     clipsContent: true,
   });
   _addonMkFrame(area, {
-    name: "image", x: 38, y: 0, width: 220, height: 118,
+    name: "image", x: 38, y: 0, width: 220, height: 138,
   });
 
   // AD_IMG: 광고 배지 SVG (사용자 제공 · 2026-07-08). 기본 hidden, 필요 시 visible 로 켬.
@@ -1477,7 +1478,7 @@ async function buildAddonLifeTop(opts) {
   const adImg = figma.createNodeFromSvg(AD_IMG_SVG);
   adImg.name = "AD_IMG";
   adImg.x = 292;
-  adImg.y = 200;
+  adImg.y = 212;
   adImg.visible = false;
   outer.appendChild(adImg);
 
@@ -1551,39 +1552,94 @@ async function buildAddonLifeBottom(opts) {
   return outer;
 }
 
-// 지원금혜택 하단 (984×264 → display 350×88, 얇은 리스트 아이템)
-// 좌측: 원형 아이콘 배경 (56×56) + image 슬롯 (40×40, 2D flat 아이콘 자리)
-// 우측: 메인 문구 + pill 버튼 (54×22, svc 라벨)
+// 지원금혜택 하단 (984×264 → display 328×88)
+// Figma reference: 149:5758
+// 구조: 좌측 원형 아이콘(56×56, bg circle + image slot 40×40).
+// 우측 txt-con: 서브 텍스트(sub_text 13/18 Regular) + main_row(메인 TEXT 16/22 Bold + tag chip).
+// tag chip 은 auto-layout 으로 텍스트 길이에 맞춰 자동 크기 조절, 색상은 apply 시 이미지
+// dominant color 로 채워짐 (bg=pastel, text=saturated).
 async function buildAddonSupportBottom(opts) {
   opts = opts || {};
   const svc = opts.serviceName || "서비스명";
   const outer = _addonMkFrame(null, {
-    name: "image_지원금혜택_" + svc + "_bottom_984x264",
-    width: 350, height: 88,
+    name: "banner_benefits_" + svc + "_bottom_984x264",
+    width: 328, height: 88,
     fills: _addonSolid("#ffffff"),
   });
   figma.currentPage.appendChild(outer);
-  const li = _addonMkFrame(outer, { name: "li", x: 11, y: 0, width: 328, height: 88 });
-  const iconWrap = _addonMkFrame(li, { name: "icon", x: 0, y: 16, width: 56, height: 56 });
+
+  // 좌측 원형 아이콘. ellipse 는 apply 시 이미지 dominant 로 변경되지 않는 고정 배경
+  // (사용자 지시 2026-07-08). "bg" 대신 "ellipse" 로 명명해 pastel 라우팅에서 제외.
+  // Figma 원본은 blur/gradient 이미지지만 단색 pastel 로 근사.
+  const iconWrap = _addonMkFrame(outer, {
+    name: "icon", x: 0, y: 16, width: 56, height: 56,
+    clipsContent: true,
+  });
   _addonMkFrame(iconWrap, {
-    name: "bg", x: 0, y: 0, width: 56, height: 56,
-    fills: _addonSolid("#f0f2f5"), cornerRadius: 28,
+    name: "ellipse", x: 0, y: 0, width: 56, height: 56,
+    fills: _addonSolid("#eaf1fb"), cornerRadius: 28,
   });
-  _addonMkFrame(iconWrap, { name: "image", x: 8, y: 8, width: 40, height: 40 });
-  const txtCon = _addonMkFrame(li, { name: "txt-con", x: 72, y: 22, width: 248, height: 44 });
+  _addonMkFrame(iconWrap, {
+    name: "image", x: 8, y: 8, width: 40, height: 40,
+    fills: _addonSolid("#cbd8e8"), cornerRadius: 8,
+  });
+
+  // 우측 txt-con (수직 auto-layout, gap 2)
+  const txtCon = _addonMkFrame(outer, {
+    name: "txt-con", x: 76, y: 23, width: 244, height: 42, fills: [],
+  });
+  txtCon.layoutMode = "VERTICAL";
+  txtCon.itemSpacing = 2;
+  txtCon.paddingLeft = 0; txtCon.paddingRight = 0;
+  txtCon.paddingTop = 0; txtCon.paddingBottom = 0;
+  txtCon.primaryAxisSizingMode = "AUTO";       // height hugs content
+  txtCon.counterAxisSizingMode = "FIXED";      // width 244 fixed
+  txtCon.counterAxisAlignItems = "MIN";        // left-align
+
+  // sub_text (13/18 Regular #666) — placeholder 기본 텍스트로 템플릿 감 유지.
+  // 스펙 셀에 텍스트가 부족해도 빈 슬롯이 안 남고 예시가 표시됨.
+  // textAutoResize=NONE 로 고정 244×18 유지 → 긴 내용도 1줄로 클립되어 레이아웃 안 흐트러짐.
   await _addonMkText(txtCon, {
-    name: "TEXT", x: 0, y: 0, width: 190, height: 44,
-    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, lineHeight: 22,
-    color: ADDON_DEFAULT_TEXT_HEX, textAutoResize: "NONE",
+    name: "sub_text", characters: "앱에서 간편하게 이용하세요",
+    font: ADDON_FONT_REG, fontSize: 13, lineHeight: 18,
+    color: ADDON_DEFAULT_SUB_TEXT_HEX,
+    textAutoResize: "NONE", width: 244, height: 18,
   });
-  const btn = _addonMkFrame(txtCon, {
-    name: "Button/small", x: 194, y: 11, width: 54, height: 22,
-    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 4,
+
+  // main_row (수평 auto-layout: main TEXT + tag chip)
+  const mainRow = _addonMkFrame(txtCon, {
+    name: "main_row", width: 244, height: 22, fills: [],
   });
-  await _addonMkText(btn, {
-    name: "TEXT", x: 0, y: 3, width: 54, height: 16,
-    characters: svc, font: ADDON_FONT_SEMI, fontSize: 10, color: "#ffffff",
-    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+  mainRow.layoutMode = "HORIZONTAL";
+  mainRow.itemSpacing = 8;
+  mainRow.counterAxisAlignItems = "CENTER";
+  mainRow.primaryAxisSizingMode = "FIXED";      // 244 wide
+  mainRow.counterAxisSizingMode = "AUTO";       // height hugs
+
+  await _addonMkText(mainRow, {
+    name: "TEXT", characters: "메인 타이틀",
+    font: ADDON_FONT_BOLD, fontSize: 16, lineHeight: 22,
+    color: "#000000", textAutoResize: "WIDTH_AND_HEIGHT",
+  });
+
+  // tag chip (수평 auto-layout, 텍스트 길이에 따라 자동 크기)
+  // 기본 색은 pastel/saturated placeholder — apply 시 이미지 dominant color 로 갱신됨.
+  const tag = _addonMkFrame(mainRow, {
+    name: "tag", fills: _addonSolid("#ffece0"), cornerRadius: 12,
+  });
+  tag.layoutMode = "HORIZONTAL";
+  tag.paddingLeft = 6; tag.paddingRight = 6;
+  tag.paddingTop = 2; tag.paddingBottom = 2;
+  tag.primaryAxisSizingMode = "AUTO";
+  tag.counterAxisSizingMode = "AUTO";
+  tag.primaryAxisAlignItems = "CENTER";
+  tag.counterAxisAlignItems = "CENTER";
+
+  await _addonMkText(tag, {
+    name: "tag_text", characters: "태그",
+    font: ADDON_FONT_REG, fontSize: 13, lineHeight: 18,
+    color: "#ff5834", textAutoResize: "WIDTH_AND_HEIGHT",
+    textAlignHorizontal: "CENTER",
   });
   return outer;
 }
@@ -1974,24 +2030,25 @@ async function applyGeneratedImage(msg) {
         } else {
           frameNode = figma.getNodeById(frameNodeId);
         }
-        // 홈 중단(addon-home-middle) 은 프레임 자체가 아니라 내부 "bg" descendant 카드에
-        // pastel 을 얹어야 함 (하단 흰색 텍스트 카드가 오버레이 되기 때문에 프레임 fill 은
-        // 어차피 안 보임). 다른 addon-* 는 외곽 프레임 hidden pastel 로 기존 동작 유지.
-        // support-bottom 등 다른 위치도 "bg" descendant 를 갖지만 (예: 아이콘 원형 bg)
-        // 그건 pastel 대상이 아니므로 홈 중단으로 한정.
+        // 특정 addon 은 외곽 프레임 fill 대신 내부 "bg" descendant 에 pastel 을 얹음.
+        // - addon-home-middle: 하단 흰색 텍스트 카드가 오버레이돼 외곽 fill 이 안 보임.
+        // (addon-support-bottom 은 ellipse 아이콘 배경이 고정 pastel 이라 여기 없음)
+        const bgDescendantAddons = { "addon-home-middle": true };
         let bgTarget = null;
         let bgIsDescendant = false;
-        if (applyMode === "addon-home-middle" && frameNode && "children" in frameNode) {
+        if (bgDescendantAddons[applyMode] && frameNode && "children" in frameNode) {
           bgTarget = _findDescendantByName(frameNode, "bg");
           if (bgTarget && "fills" in bgTarget) bgIsDescendant = true;
           else bgTarget = null;
         }
-        if (!bgTarget && frameNode && "fills" in frameNode) bgTarget = frameNode;
+        if (!bgTarget && frameNode && "fills" in frameNode &&
+            applyMode !== "addon-support-bottom") {
+          // support-bottom 은 외곽이 흰색 유지되어야 하므로 fallback 대상 아님
+          bgTarget = frameNode;
+        }
         if (bgTarget) {
           bgTarget.fills = [{
             type: "SOLID", color: rgb,
-            // bg descendant 는 실제로 보여야 하므로 항상 visible.
-            // 외곽 프레임 fallback 은 기존 로직대로 addon 이면 hidden.
             visible: bgIsDescendant ? true : bgVisible,
           }];
           frameBgApplied = bgHex + (bgIsDescendant ? " (→ bg descendant)" : "");
@@ -2007,10 +2064,34 @@ async function applyGeneratedImage(msg) {
             frameRenamedTo = newName;
           }
         }
+        // addon-support-bottom: 우측 tag chip 색상을 이미지 dominant color 로 갱신.
+        //   tag(프레임) fills = pastel(backgroundColor)
+        //   tag_text(TEXT) fills = saturated(buttonColor)
+        // 버튼 노드 자체는 이 위치에 없으므로 아래 button gradient 블록은 fuzzy-match
+        // 실패 → NOT_FOUND 로그가 남는데 무해. (사용자 요청 2026-07-08)
+        if (frameNode && applyMode === "addon-support-bottom") {
+          try {
+            const tagNode = _findDescendantByName(frameNode, "tag");
+            if (tagNode && "fills" in tagNode) {
+              tagNode.fills = [{ type: "SOLID", color: rgb, visible: true }];
+            }
+            const tagTextNode = _findDescendantByName(frameNode, "tag_text");
+            if (tagTextNode && "fills" in tagTextNode && buttonHex) {
+              const tagRgb = _hexToRgbNormalized(buttonHex);
+              if (tagRgb) {
+                tagTextNode.fills = [{ type: "SOLID", color: tagRgb, visible: true }];
+              }
+            }
+          } catch (tagErr) {
+            // tag 갱신 실패는 무해 — 프레임에 tag 가 없거나 이름이 다를 뿐
+          }
+        }
         // addon-*: 버튼 descendant 에 그라데이션 fill (또는 solid) 적용.
-        // 우선순위: buttonGradient > buttonColor (backward compat)
+        // 우선순위: buttonGradient > buttonColor (backward compat).
+        // 단, support-bottom 은 버튼이 없으므로 skip.
         const buttonGradient = msg && msg.buttonGradient;
-        if (frameNode && isAddonApply && (buttonGradient || buttonHex)) {
+        if (frameNode && isAddonApply && applyMode !== "addon-support-bottom" &&
+            (buttonGradient || buttonHex)) {
           const btnNode = _findButtonDescendant(frameNode);
           if (btnNode && "fills" in btnNode) {
             try {
