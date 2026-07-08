@@ -1304,6 +1304,13 @@ async function _addonMkText(parent, opts) {
   if (opts.color) t.fills = _addonSolid(opts.color);
   if (opts.textAlignHorizontal) t.textAlignHorizontal = opts.textAlignHorizontal;
   if (opts.textAutoResize) t.textAutoResize = opts.textAutoResize;
+  if (opts.lineHeight !== undefined) {
+    try {
+      t.lineHeight = typeof opts.lineHeight === "number"
+        ? { value: opts.lineHeight, unit: "PIXELS" }
+        : opts.lineHeight;
+    } catch (e) {}
+  }
   if (parent) parent.appendChild(t);
   return t;
 }
@@ -1317,23 +1324,32 @@ async function buildAddonHomeTop(opts) {
     width: 360, height: 176, fills: [],
   });
   figma.currentPage.appendChild(outer);
+  // Figma 원본과 동일: 좌우 패딩 24, con·button 폭 312 유지.
+  // 안쪽 폭 312 에서 image 122×107 을 그대로 두려면 txt ≤ 190 (area 는 122 그대로).
+  // 190 은 3번째 라인 "앱에서 간편하게 진행하세요"(≈ 193-195px) 를 약간 넘김.
+  // txt 프레임의 clipsContent=false 로 두면 TEXT(WIDTH_AND_HEIGHT) 가 프레임 경계 밖으로
+  // 몇 px 자연스럽게 넘치며 잘리지 않음. 3D 이미지의 좌측 여백에 겹쳐 시각적 충돌 최소화.
   const text = _addonMkFrame(outer, { name: "text", x: 24, y: 0, width: 312, height: 168 });
   const con  = _addonMkFrame(text,  { name: "con",  x: 0, y: 0, width: 312, height: 132 });
-  const txt  = _addonMkFrame(con,   { name: "txt",  x: 0, y: 0, width: 154, height: 132 });
-  await _addonMkText(txt, {
-    name: "TEXT", x: 0, y: 32, width: 145, height: 72,
-    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, color: ADDON_DEFAULT_TEXT_HEX,
-    textAutoResize: "NONE",
+  const txt  = _addonMkFrame(con,   {
+    name: "txt", x: 0, y: 0, width: 190, height: 132,
+    clipsContent: false,
   });
-  _addonMkFrame(con, { name: "image", x: 164, y: 0, width: 148, height: 132 });
+  await _addonMkText(txt, {
+    name: "TEXT", x: 0, y: 32,
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 18, lineHeight: 24,
+    color: ADDON_DEFAULT_TEXT_HEX, textAutoResize: "WIDTH_AND_HEIGHT",
+  });
+  const area = _addonMkFrame(con, { name: "area", x: 190, y: 0, width: 122, height: 132 });
+  _addonMkFrame(area, { name: "image", x: 0, y: 12, width: 122, height: 107 });
   const btn = _addonMkFrame(text, {
     name: "Button/small", x: 0, y: 132, width: 312, height: 36,
-    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 6,
+    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 8,
   });
   await _addonMkText(btn, {
     name: "TEXT", x: 0, y: 8, width: 312, height: 20,
-    characters: "", font: ADDON_FONT_SEMI, fontSize: 14, color: "#ffffff",
-    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, lineHeight: 20,
+    color: "#ffffff", textAlignHorizontal: "CENTER", textAutoResize: "NONE",
   });
   return outer;
 }
@@ -1436,6 +1452,43 @@ async function buildAddonLifeBottom(opts) {
   return outer;
 }
 
+// 지원금혜택 하단 (984×264 → display 350×88, 얇은 리스트 아이템)
+// 좌측: 원형 아이콘 배경 (56×56) + image 슬롯 (40×40, 2D flat 아이콘 자리)
+// 우측: 메인 문구 + pill 버튼 (54×22, svc 라벨)
+async function buildAddonSupportBottom(opts) {
+  opts = opts || {};
+  const svc = opts.serviceName || "서비스명";
+  const outer = _addonMkFrame(null, {
+    name: "image_지원금혜택_" + svc + "_bottom_984x264",
+    width: 350, height: 88,
+    fills: _addonSolid("#ffffff"),
+  });
+  figma.currentPage.appendChild(outer);
+  const li = _addonMkFrame(outer, { name: "li", x: 11, y: 0, width: 328, height: 88 });
+  const iconWrap = _addonMkFrame(li, { name: "icon", x: 0, y: 16, width: 56, height: 56 });
+  _addonMkFrame(iconWrap, {
+    name: "bg", x: 0, y: 0, width: 56, height: 56,
+    fills: _addonSolid("#f0f2f5"), cornerRadius: 28,
+  });
+  _addonMkFrame(iconWrap, { name: "image", x: 8, y: 8, width: 40, height: 40 });
+  const txtCon = _addonMkFrame(li, { name: "txt-con", x: 72, y: 22, width: 248, height: 44 });
+  await _addonMkText(txtCon, {
+    name: "TEXT", x: 0, y: 0, width: 190, height: 44,
+    characters: "", font: ADDON_FONT_BOLD, fontSize: 14, lineHeight: 22,
+    color: ADDON_DEFAULT_TEXT_HEX, textAutoResize: "NONE",
+  });
+  const btn = _addonMkFrame(txtCon, {
+    name: "Button/small", x: 194, y: 11, width: 54, height: 22,
+    fills: _addonSolid(ADDON_DEFAULT_BUTTON_HEX), cornerRadius: 4,
+  });
+  await _addonMkText(btn, {
+    name: "TEXT", x: 0, y: 3, width: 54, height: 16,
+    characters: svc, font: ADDON_FONT_SEMI, fontSize: 10, color: "#ffffff",
+    textAlignHorizontal: "CENTER", textAutoResize: "NONE",
+  });
+  return outer;
+}
+
 // 소통참여 하단 (480×348 → display 160×116)
 async function buildAddonSotongBottom(opts) {
   opts = opts || {};
@@ -1477,11 +1530,12 @@ function _guessServiceNameFromTexts(texts) {
 }
 
 const ADDON_BUILDERS = {
-  "home-top":       buildAddonHomeTop,
-  "home-middle":    buildAddonHomeMiddle,
-  "life-top":       buildAddonLifeTop,
-  "life-bottom":    buildAddonLifeBottom,
-  "sotong-bottom":  buildAddonSotongBottom,
+  "home-top":        buildAddonHomeTop,
+  "home-middle":     buildAddonHomeMiddle,
+  "life-top":        buildAddonLifeTop,
+  "life-bottom":     buildAddonLifeBottom,
+  "support-bottom":  buildAddonSupportBottom,
+  "sotong-bottom":   buildAddonSotongBottom,
 };
 
 async function buildAddonTemplateByPosition(position, opts) {
@@ -1549,14 +1603,24 @@ async function deleteAddonTemplate(position) {
 // - 인스턴스를 선택 셀 우측(x + width + 24, 같은 y) 에 배치
 // - 인스턴스의 placeholder 텍스트 슬롯을 위→아래 순으로 채움
 // - 새 인스턴스를 selection 으로 설정해서 이어서 image_generate_prepare 가 그대로 동작
-async function createAddonFromSpec(position) {
+async function createAddonFromSpec(position, nodeId) {
   if (!position) { postError("위치 종류가 지정되지 않았습니다."); return; }
-  const sel = figma.currentPage.selection;
-  if (sel.length !== 1) {
-    postError("기획 스펙 셀(프레임) 1개를 선택해주세요.");
-    return;
+  let specNode = null;
+  if (nodeId) {
+    try {
+      specNode = (typeof figma.getNodeByIdAsync === "function")
+        ? await figma.getNodeByIdAsync(nodeId)
+        : figma.getNodeById(nodeId);
+    } catch (e) { specNode = null; }
+    if (!specNode) { postError("지정된 프레임을 찾지 못했습니다 (id=" + nodeId + ")"); return; }
+  } else {
+    const sel = figma.currentPage.selection;
+    if (sel.length !== 1) {
+      postError("기획 스펙 셀(프레임) 1개를 선택해주세요.");
+      return;
+    }
+    specNode = sel[0];
   }
-  const specNode = sel[0];
   if (!("children" in specNode)) {
     postError("자식 노드를 가진 프레임을 선택해주세요. (현재: " + specNode.type + ")");
     return;
@@ -1580,48 +1644,24 @@ async function createAddonFromSpec(position) {
     return;
   }
 
-  // 템플릿 확보: 우선 등록된 라이브러리 인스턴스 → 없으면 코드 내장 builder 로 폴백
-  const map = await _getAddonTemplates();
-  const tpl = map[position];
+  // 템플릿 확보: 코드 내장 builder 만 사용 (2026-07-08 이후).
+  // 이전에는 라이브러리 인스턴스가 등록돼 있으면 우선 임포트했으나,
+  // 라이브러리 템플릿의 whitespace-nowrap · overflow-clip 등 디자인 세부가
+  // 코드 빌더와 어긋나 텍스트 잘림/영역 불일치가 반복돼서 경로를 단일화.
+  // addon_templates 저장소는 UI 호환을 위해 남겨두지만 여기선 참조하지 않음.
   let inst = null;
   let templateName = "";
   let templateSource = "";
-  let detached = false;
-  if (tpl && tpl.key) {
-    try {
-      const comp = await figma.importComponentByKeyAsync(tpl.key);
-      const rawInst = comp.createInstance();
-      figma.currentPage.appendChild(rawInst);
-      // 사용자 요청: 라이브러리 인스턴스 → 즉시 detach 해서 순수 FRAME 으로 전환.
-      // 이유: 프레임명 _#hex 갱신·자식 노드 fills override 가 main component sync 에 되돌려질
-      // 위험을 없애고, 이후 편집이 라이브러리와 독립되도록.
-      try {
-        inst = rawInst.detachInstance();
-        detached = true;
-      } catch (dErr) {
-        // detach 실패 (예: 컴포넌트 아님) → 원본 인스턴스 그대로 사용
-        inst = rawInst;
-      }
-      templateName = tpl.name || "(라이브러리)";
-      templateSource = "library";
-    } catch (e) {
-      // 실패시 builder 로 폴백
-      inst = null;
-    }
+  const detached = false;
+  const svcHint = _guessServiceNameFromTexts(texts) || "서비스명";
+  const built = await buildAddonTemplateByPosition(position, { serviceName: svcHint });
+  if (!built) {
+    postError("[" + position + "] 위치용 코드 내장 builder 를 찾지 못했습니다.");
+    return;
   }
-  if (!inst) {
-    // 서비스명 힌트: 스펙 셀 첫 텍스트에서 짧은 명사(라벨 후보) 를 추출.
-    // 없으면 "서비스명" 그대로 두고 사용자가 수정.
-    const svcHint = _guessServiceNameFromTexts(texts) || "서비스명";
-    const built = await buildAddonTemplateByPosition(position, { serviceName: svcHint });
-    if (!built) {
-      postError("[" + position + "] 위치용 코드 내장 builder 를 찾지 못했습니다.");
-      return;
-    }
-    inst = built;
-    templateName = "(코드 내장) " + inst.name;
-    templateSource = "code";
-  }
+  inst = built;
+  templateName = "(코드 내장) " + inst.name;
+  templateSource = "code";
   inst.x = specNode.x + specNode.width + 24;
   inst.y = specNode.y;
 
@@ -1734,6 +1774,13 @@ function _hexToRgbNormalized(hex) {
 async function applyGeneratedImage(msg) {
   const targetNodeId = msg && msg.targetNodeId;
   const b64 = msg && msg.base64;
+  figma.ui.postMessage({
+    type: "log", level: "muted",
+    message: "  → applyGeneratedImage 호출 · target=" + (targetNodeId || "(없음)") +
+      " · frame=" + ((msg && msg.frameNodeId) || "(없음)") +
+      " · applyMode=" + ((msg && msg.applyMode) || "(없음)") +
+      " · base64=" + (b64 ? (b64.length + "B") : "(비어있음)"),
+  });
   if (!targetNodeId || !b64) {
     figma.ui.postMessage({
       type: "image_generate_error",
@@ -2110,7 +2157,7 @@ figma.ui.onmessage = async function (msg) {
     }
   } else if (msg.type === "addon_from_spec") {
     try {
-      await createAddonFromSpec(msg.position);
+      await createAddonFromSpec(msg.position, msg.nodeId || null);
     } catch (e) {
       postError("기획 셀 자동 생성 오류: " + (e && e.message ? e.message : String(e)));
     }
@@ -2324,7 +2371,12 @@ function _summarizeSelection() {
   const frames = [];
   for (const n of sel) {
     if (n.type === "FRAME" || n.type === "INSTANCE" || n.type === "COMPONENT") {
-      frames.push({ id: n.id, name: n.name || "(이름 없음)" });
+      frames.push({
+        id: n.id,
+        name: n.name || "(이름 없음)",
+        width: Math.round(n.width || 0),
+        height: Math.round(n.height || 0),
+      });
     }
   }
   return {

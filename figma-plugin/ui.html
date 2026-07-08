@@ -427,9 +427,9 @@
     <div class="sub-tab-bar">
       <button class="sub-tab-btn active" data-sub="sub-banner">배너</button>
       <button class="sub-tab-btn" data-sub="sub-popup">팝업</button>
-      <button class="sub-tab-btn" data-sub="sub-detail">상세페이지</button>
-      <button class="sub-tab-btn" data-sub="sub-sotong">소통참여</button>
       <button class="sub-tab-btn" data-sub="sub-addon">부가서비스</button>
+      <button class="sub-tab-btn" data-sub="sub-sotong">소통참여</button>
+      <button class="sub-tab-btn" data-sub="sub-detail">상세페이지</button>
     </div>
     <div style="padding-top:10px;">
 
@@ -533,30 +533,6 @@
         </div>
       </div>
 
-      <!-- 상세페이지 -->
-      <div class="sub-tab-content" id="sub-detail">
-        <div class="card">
-          <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
-            캔버스에서 기준 프레임 선택 (없어도 됨) → 종류·템플릿 선택 → [적용]<br/>
-            선택한 프레임 바로 아래에 배치됩니다.
-          </p>
-          <label class="lbl">섹션 종류</label>
-          <select id="ds-apply-type" class="text-input" style="margin-bottom:6px;">
-            <option value="main-image">메인 이미지</option>
-            <option value="coupon">쿠폰</option>
-            <option value="text">텍스트</option>
-            <option value="button">버튼</option>
-            <option value="marketing">마케팅수신동의</option>
-            <option value="notice">유의사항</option>
-          </select>
-          <label class="lbl">템플릿</label>
-          <select id="ds-apply-template" class="text-input" style="margin-bottom:6px;">
-            <option value="">(등록된 템플릿 없음)</option>
-          </select>
-          <button id="ds-apply-btn" class="btn-apply">적용</button>
-        </div>
-      </div>
-
       <!-- 소통참여 -->
       <div class="sub-tab-content" id="sub-sotong">
         <div class="card">
@@ -603,12 +579,13 @@
         <div class="card">
           <label class="lbl">위치 (프레임 크기)</label>
           <select id="addon-position" class="text-input" style="margin-bottom:8px;">
-            <option value="icon">아이콘 (48×48)</option>
             <option value="home-top">홈 상단 (1080×528)</option>
             <option value="home-middle">홈 중단 (360×378)</option>
             <option value="life-top">생활편의 상단 (984×840)</option>
             <option value="life-bottom">생활편의 하단 (1080×가변)</option>
+            <option value="support-bottom">지원금혜택 하단 (984×264)</option>
             <option value="sotong-bottom">소통참여 하단 (480×348)</option>
+            <option value="icon">3D 아이콘화 (48×48)</option>
           </select>
 
           <label class="lbl">프롬프트 코멘트 (선택)</label>
@@ -653,6 +630,44 @@
             </div>
           </div>
         </div>
+
+        <div class="card">
+          <label class="lbl">기획 템플릿 일괄 적용</label>
+          <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
+            여러 프레임을 선택하면 크기로 위치를 자동 판별합니다.
+          </p>
+          <button id="addon-batch-apply" class="secondary" style="font-size:12px;padding:7px;background:#444;color:#fff;">일괄 적용 실행</button>
+          <div class="img-gen-status" id="addon-batch-img-gen-status">
+            <span class="timer" id="addon-batch-img-gen-timer">0s</span>
+            <span class="stage" id="addon-batch-img-gen-stage">준비 중…</span>
+            <div class="substep" id="addon-batch-img-gen-substep"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 상세페이지 -->
+      <div class="sub-tab-content" id="sub-detail">
+        <div class="card">
+          <p style="font-size:12px;color:#6a7689;margin:0 0 8px;line-height:1.5;">
+            캔버스에서 기준 프레임 선택 (없어도 됨) → 종류·템플릿 선택 → [적용]<br/>
+            선택한 프레임 바로 아래에 배치됩니다.
+          </p>
+          <label class="lbl">섹션 종류</label>
+          <select id="ds-apply-type" class="text-input" style="margin-bottom:6px;">
+            <option value="main-image">메인 이미지</option>
+            <option value="coupon">쿠폰</option>
+            <option value="text">텍스트</option>
+            <option value="button">버튼</option>
+            <option value="marketing">마케팅수신동의</option>
+            <option value="notice">유의사항</option>
+          </select>
+          <label class="lbl">템플릿</label>
+          <select id="ds-apply-template" class="text-input" style="margin-bottom:6px;">
+            <option value="">(등록된 템플릿 없음)</option>
+          </select>
+          <button id="ds-apply-btn" class="btn-apply">적용</button>
+        </div>
       </div>
 
     </div>
@@ -696,12 +711,13 @@
       </details>
       <label class="lbl">위치 종류</label>
       <select id="addon-tpl-type" class="text-input" style="margin-bottom:6px;">
-        <option value="icon">아이콘 (48×48)</option>
         <option value="home-top">홈 상단 (1080×528)</option>
         <option value="home-middle">홈 중단 (360×378)</option>
         <option value="life-top">생활편의 상단 (984×840)</option>
         <option value="life-bottom">생활편의 하단 (1080×가변)</option>
+        <option value="support-bottom">지원금혜택 하단 (984×264)</option>
         <option value="sotong-bottom">소통참여 하단 (480×348)</option>
+        <option value="icon">3D 아이콘화 (48×48)</option>
       </select>
       <div class="btn-row" style="margin-bottom:6px;">
         <button id="addon-tpl-add" class="btn-reg">+ 등록</button>
@@ -978,6 +994,9 @@
   // 일괄 처리 상태 (selection 여러 frame 시)
   // { kind, style, hint, templateKey, items: [{id,name}], idx, errors: [] }
   let _batchState = null;
+  // 부가서비스 일괄 적용 상태 (크기 시그니처 매핑 후 순차 실행)
+  // { items: [{nodeId, name, position, label, applyKind, positionStyle}], idx, errors, extraHint }
+  let _addonBatchState = null;
   // code.js 가 알려주는 최신 selection 정보 (frame multi-select 감지용)
   let _selectionInfo = { total: 0, frameCount: 0, frames: [] };
 
@@ -990,6 +1009,11 @@
     _imgGenStartTs = Date.now();
     const box = document.getElementById(kind + "-img-gen-status");
     if (box) box.classList.add("active");
+    // 부가서비스 일괄 적용 중이면 배치 카드의 상태 박스도 함께 활성화
+    if (_addonBatchState) {
+      const bBox = document.getElementById("addon-batch-img-gen-status");
+      if (bBox) bBox.classList.add("active");
+    }
     _imgGenSetStage("준비 중…", "");
     if (_imgGenTimerHandle) clearInterval(_imgGenTimerHandle);
     _imgGenTimerHandle = setInterval(() => {
@@ -997,6 +1021,8 @@
       const s = Math.floor((Date.now() - _imgGenStartTs) / 1000);
       const t = document.getElementById(_imgGenActiveKind + "-img-gen-timer");
       if (t) t.textContent = s + "s";
+      const bt = document.getElementById("addon-batch-img-gen-timer");
+      if (bt) bt.textContent = s + "s";
     }, 500);
   }
   function _imgGenSetStage(stageText, substepText) {
@@ -1005,6 +1031,13 @@
     const subEl = document.getElementById(_imgGenActiveKind + "-img-gen-substep");
     if (stageEl) stageEl.textContent = stageText;
     if (subEl) subEl.textContent = substepText || "";
+    const bBox = document.getElementById("addon-batch-img-gen-status");
+    if (bBox && bBox.classList.contains("active")) {
+      const bStage = document.getElementById("addon-batch-img-gen-stage");
+      const bSub = document.getElementById("addon-batch-img-gen-substep");
+      if (bStage) bStage.textContent = stageText;
+      if (bSub) bSub.textContent = substepText || "";
+    }
   }
   function _imgGenStop() {
     if (_imgGenTimerHandle) clearInterval(_imgGenTimerHandle);
@@ -1015,6 +1048,8 @@
       if (box) box.classList.remove("active");
     }
     _imgGenActiveKind = null;
+    const bBox = document.getElementById("addon-batch-img-gen-status");
+    if (bBox) bBox.classList.remove("active");
   }
 
   // ── 이미지 미리보기 (적용 전 확인) ──
@@ -1039,7 +1074,7 @@
     const btnText   = document.getElementById(kind + "-img-preview-btncolor");
     const promptEl = document.getElementById(kind + "-img-preview-prompt");
     // 미리보기 스킵 토글 또는 일괄 처리 중이면 자동 적용
-    const skip = _skipPreviewChecked(kind) || !!_batchState;
+    const skip = _skipPreviewChecked(kind) || !!_batchState || !!_addonBatchState;
     if (skip) {
       log("  · 미리보기 스킵 — 바로 적용", "muted");
       _imgGenStop();
@@ -1211,7 +1246,12 @@
         resolve: resolve,
       };
       const el = document.getElementById("promo-lib-overlay");
-      const tabId = kind === "banner" ? "sub-banner" : "sub-popup";
+      // kind 별로 인라인 카드가 렌더링될 탭을 지정.
+      // 부가서비스는 pending.kind="addon" 이므로 "sub-addon" 탭에 붙임.
+      const tabId =
+        kind === "banner" ? "sub-banner" :
+        kind === "addon"  ? "sub-addon"  :
+        "sub-popup";
       const tab = document.getElementById(tabId);
       if (tab && el.parentNode !== tab) tab.appendChild(el);   // 해당 탭 안으로 relocate
       document.getElementById("promo-lib-query").value = _promoLibState.query;
@@ -1518,27 +1558,30 @@
     //   → 프레임의 배경 pastel 은 dominant color 로 별도 적용 (배너 방식과 동일)
     // 홈 중단              → "2d-flat-solid"   (아이콘 그리드용 flat 벡터, 투명)
     const POSITION_STYLE_MAP = {
-      "home-top":      "3d",
-      "life-top":      "3d",
-      "home-middle":   "2d-flat-solid",
-      "life-bottom":   "3d",
-      "sotong-bottom": "3d",
+      "home-top":       "3d",
+      "life-top":       "3d",
+      "home-middle":    "2d-flat-solid",
+      "life-bottom":    "3d",
+      "support-bottom": "2d-flat-solid",
+      "sotong-bottom":  "3d",
     };
     // 위치별 apply kind — code.js 의 target picker/branch 가 이 값을 씀
     const POSITION_KIND_MAP = {
-      "home-top":      "addon-home-top",
-      "home-middle":   "addon-home-middle",
-      "life-top":      "addon-life-top",
-      "life-bottom":   "addon-life-bottom",
-      "sotong-bottom": "addon-sotong-bottom",
+      "home-top":       "addon-home-top",
+      "home-middle":    "addon-home-middle",
+      "life-top":       "addon-life-top",
+      "life-bottom":    "addon-life-bottom",
+      "support-bottom": "addon-support-bottom",
+      "sotong-bottom":  "addon-sotong-bottom",
     };
     // 위치별 selection 이 이미 해당 템플릿 인스턴스인지 판단하는 정규식
     const POSITION_EXISTING_RE = {
-      "home-top":      /^image_홈_.+_top_/,
-      "home-middle":   /^image_홈_.+_middle_/,
-      "life-top":      /^image_생활편의_.+_top_/,
-      "life-bottom":   /^image_생활편의_.+_bottom_/,
-      "sotong-bottom": /^banner_소통참여_.+_bottom_/,
+      "home-top":       /^image_홈_.+_top_/,
+      "home-middle":    /^image_홈_.+_middle_/,
+      "life-top":       /^image_생활편의_.+_top_/,
+      "life-bottom":    /^image_생활편의_.+_bottom_/,
+      "support-bottom": /^image_지원금혜택_.+_bottom_/,
+      "sotong-bottom":  /^banner_소통참여_.+_bottom_/,
     };
     const positionStyle = POSITION_STYLE_MAP[position] || "3d";
     const applyKind     = POSITION_KIND_MAP[position]  || "addon-home-top";
@@ -1572,6 +1615,127 @@
     }
   }
   if (addonApplyImageBtn) addonApplyImageBtn.addEventListener("click", _triggerAddonApplyImage);
+
+  // ── 부가서비스 일괄 적용 (기획 템플릿 여러 프레임 자동 매핑) ──
+  // 크기 시그니처: [w_center, h_center, w_tol, h_tol, position]. 오차 20% 이내.
+  // "가변" 위치(life-bottom, home-top)는 넓은 tolerance.
+  const ADDON_SIZE_SIGNATURES = [
+    { w: 378, h: 185, wt: 60, ht: 30, pos: "home-top",       label: "홈 상단" },
+    { w: 124, h: 130, wt: 20, ht: 20, pos: "home-middle",    label: "홈 중단" },
+    { w: 342, h: 292, wt: 40, ht: 40, pos: "life-top",       label: "생활편의 상단" },
+    { w: 378, h: 340, wt: 40, ht: 120, pos: "life-bottom",   label: "생활편의 하단" },
+    { w: 350, h: 88,  wt: 30, ht: 20, pos: "support-bottom", label: "지원금혜택 하단" },
+    { w: 163, h: 119, wt: 25, ht: 25, pos: "sotong-bottom",  label: "소통참여 하단" },
+  ];
+
+  function _detectAddonPositionBySize(width, height) {
+    let best = null;
+    let bestScore = Infinity;
+    for (const sig of ADDON_SIZE_SIGNATURES) {
+      const dw = Math.abs(width - sig.w);
+      const dh = Math.abs(height - sig.h);
+      if (dw <= sig.wt && dh <= sig.ht) {
+        const score = (dw / sig.wt) + (dh / sig.ht);
+        if (score < bestScore) { bestScore = score; best = sig; }
+      }
+    }
+    return best;
+  }
+
+  function _triggerAddonBatchApply() {
+    const frames = (_selectionInfo && _selectionInfo.frames) || [];
+    if (frames.length === 0) {
+      log("일괄 적용: 프레임을 하나 이상 선택해주세요.", "warn");
+      return;
+    }
+    const feedback = (addonFeedbackInput && addonFeedbackInput.value || "").trim() || null;
+    const items = [];
+    const skipped = [];
+    for (const f of frames) {
+      // 이미 생성된 addon 결과물은 스킵 (기획 스펙 아님)
+      const isExisting = Object.keys(POSITION_EXISTING_RE).some(
+        k => POSITION_EXISTING_RE[k].test(f.name || "")
+      );
+      if (isExisting) {
+        skipped.push({ name: f.name, w: f.width, h: f.height, reason: "이미 생성된 템플릿" });
+        continue;
+      }
+      const sig = _detectAddonPositionBySize(f.width || 0, f.height || 0);
+      if (!sig) {
+        skipped.push({ name: f.name, w: f.width, h: f.height, reason: "크기 매칭 실패" });
+        continue;
+      }
+      items.push({
+        nodeId: f.id, name: f.name, position: sig.pos, label: sig.label,
+        applyKind: POSITION_KIND_MAP[sig.pos], positionStyle: POSITION_STYLE_MAP[sig.pos],
+      });
+    }
+    if (items.length === 0) {
+      log("일괄 적용: 매핑 가능한 프레임이 없습니다. (스킵 " + skipped.length + "개)", "warn");
+      for (const s of skipped) {
+        log("  · 스킵: " + s.name + " (" + s.w + "×" + s.h + ") — " + s.reason, "muted");
+      }
+      return;
+    }
+    log("일괄 적용 시작 — 매핑 " + items.length + "개" +
+        (skipped.length > 0 ? ", 스킵 " + skipped.length + "개" : ""), "info");
+    for (const it of items) log("  ✓ " + it.name + " → " + it.label, "muted");
+    for (const s of skipped) log("  ✗ 스킵: " + s.name + " (" + s.w + "×" + s.h + ") — " + s.reason, "muted");
+
+    _addonBatchState = { items: items, idx: 0, errors: [], extraHint: feedback };
+    _setAddonBatchBtnRunning(true, "일괄 적용 진행 중…");
+    setBusy(true);
+    _imgGenStart("addon");
+    _runNextAddonBatchStep();
+  }
+
+  function _setAddonBatchBtnRunning(running, label) {
+    const btn = document.getElementById("addon-batch-apply");
+    if (!btn) return;
+    if (running) {
+      if (!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent;
+      btn.textContent = label || "일괄 적용 진행 중…";
+      btn.disabled = true;
+    } else {
+      if (btn.dataset.origLabel) {
+        btn.textContent = btn.dataset.origLabel;
+        delete btn.dataset.origLabel;
+      }
+      btn.disabled = false;
+    }
+  }
+
+  function _runNextAddonBatchStep() {
+    if (!_addonBatchState) return;
+    const b = _addonBatchState;
+    if (b.idx >= b.items.length) {
+      const okCount = b.items.length - b.errors.length;
+      log("✓ 일괄 적용 종료 — 성공 " + okCount + "/" + b.items.length +
+          (b.errors.length > 0 ? ", 실패 " + b.errors.length : ""), "ok");
+      _addonBatchState = null;
+      _chainImageGenAfterApply = null;
+      _imageGenPending = null;
+      _imgGenStop();
+      setBusy(false);
+      _setAddonBatchBtnRunning(false);
+      return;
+    }
+    const cur = b.items[b.idx];
+    b.idx++;
+    _imgGenSetStage("일괄 " + b.idx + "/" + b.items.length + " · " + cur.label, cur.name);
+    log("  [" + b.idx + "/" + b.items.length + "] " + cur.name + " → " + cur.label, "muted");
+    _imageGenPending = {
+      kind: "addon", applyMode: cur.applyKind,
+      extraHint: b.extraHint, style: cur.positionStyle,
+    };
+    _chainImageGenAfterApply = { kind: cur.applyKind, extraHint: b.extraHint, style: cur.positionStyle };
+    parent.postMessage({
+      pluginMessage: { type: "addon_from_spec", position: cur.position, nodeId: cur.nodeId },
+    }, "*");
+  }
+
+  const addonBatchApplyBtn = document.getElementById("addon-batch-apply");
+  if (addonBatchApplyBtn) addonBatchApplyBtn.addEventListener("click", _triggerAddonBatchApply);
 
   // ── 설정 탭 · 부가서비스 템플릿 등록/삭제 ──
   const addonTplTypeSelect = document.getElementById("addon-tpl-type");
@@ -1885,7 +2049,12 @@
     } else if (msg.type === "error") {
       log("✗ " + msg.message, "error");
       _chainImageGenAfterApply = null;
-      setBusy(false);
+      if (_addonBatchState) {
+        _addonBatchState.errors.push(msg.message || "(원인 미상)");
+        _runNextAddonBatchStep();
+      } else {
+        setBusy(false);
+      }
     } else if (msg.type === "load_ppt_done") {
       log("✓ Figma 배치 완료 — 슬라이드 " + msg.slideCount + "장", "ok");
       if (msg.workWarning) log("  ⚠ " + msg.workWarning, "warn");
@@ -1952,11 +2121,14 @@
       if (_chainImageGenAfterApply) {
         const chain = _chainImageGenAfterApply;
         _chainImageGenAfterApply = null;
-        _imageGenPending = { kind: "addon", applyMode: "addon-home-top", extraHint: chain.extraHint, style: chain.style };
+        _imageGenPending = { kind: "addon", applyMode: chain.kind || "addon-home-top", extraHint: chain.extraHint, style: chain.style };
         _imgGenSetStage("이미지 자리 탐색 중…", "생성된 새 템플릿에서 이미지 슬롯 확인");
         parent.postMessage({
           pluginMessage: { type: "image_generate_prepare", kind: chain.kind, extraHint: chain.extraHint },
         }, "*");
+      } else if (_addonBatchState) {
+        // 위치 판별 실패 등으로 chain 이 없어도 batch 는 계속 진행
+        _runNextAddonBatchStep();
       } else {
         setBusy(false);
         _imgGenStop();
@@ -2051,10 +2223,13 @@
       // ─ PLATFORM-8 라이브러리 우선 시도 ─
       // 팝업/배너, 그리고 부가서비스 addon-*(단, addon-icon 은 이미지 변환이라 매칭 부적합)
       // 소통참여(sotong 실사 사진) 는 제외.
+      // 부가서비스는 pending.kind="addon" 이고 세부 위치는 pending.applyMode 에 담김
+      // ("addon-home-top" 등) — kind 대신 applyMode 로 게이트해야 addon 도 매칭 흐름 진입.
+      const _plibApplyMode = String(pending.applyMode || "");
       const _plibKindOk =
         pending.kind === "popup" ||
         pending.kind === "banner" ||
-        (String(pending.kind || "").indexOf("addon-") === 0 && pending.kind !== "addon-icon");
+        (_plibApplyMode.indexOf("addon-") === 0 && _plibApplyMode !== "addon-icon");
       // 검색어: 프레임명의 promotion + 프레임 내 텍스트 노드 전부
       const _plibFrameName = msg.frameName || msg.targetName || "";
       const _plibPromotion = _plibKindOk ? _plibExtractPromotion(_plibFrameName) : "";
@@ -2109,7 +2284,7 @@
               // 미리보기 UI 건너뛰고 바로 프레임 fill — 사용자가 이미 썸네일로 확인함
               _imgGenSetStage("Figma 에 적용 중…", "이미지 fill + 프레임 배경 pastel");
               // addon-* 케이스는 applyMode + buttonColor + buttonGradient 도 전달
-              const _plibIsAddon = String(pending.kind || "").indexOf("addon-") === 0;
+              const _plibIsAddon = _plibApplyMode.indexOf("addon-") === 0;
               parent.postMessage({
                 pluginMessage: {
                   type: "image_generate_apply",
@@ -2118,7 +2293,7 @@
                   backgroundColor: dl.background_color || null,
                   buttonColor: _plibIsAddon ? (dl.button_color || null) : null,
                   buttonGradient: _plibIsAddon ? (dl.button_gradient || null) : null,
-                  applyMode: _plibIsAddon ? pending.kind : null,
+                  applyMode: _plibIsAddon ? _plibApplyMode : null,
                   base64: dl.base64,
                   prompt: "[PLATFORM-8] " + (decision.item.subject || "") +
                           (decision.item.view ? " · " + decision.item.view : "") +
@@ -2233,6 +2408,8 @@
       if (_batchState) {
         // 일괄 모드 — busy/timer 유지하고 다음 step 으로
         _runNextBatchStep();
+      } else if (_addonBatchState) {
+        _runNextAddonBatchStep();
       } else {
         _imgGenStop();
         setBusy(false);
@@ -2243,6 +2420,9 @@
       if (_batchState) {
         _batchState.errors.push(msg.message || "(원인 미상)");
         _runNextBatchStep();
+      } else if (_addonBatchState) {
+        _addonBatchState.errors.push(msg.message || "(원인 미상)");
+        _runNextAddonBatchStep();
       } else {
         _imgGenStop();
         setBusy(false);
