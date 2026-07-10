@@ -1804,7 +1804,7 @@ async function buildAddonSotongBottom(opts) {
   txt.counterAxisSizingMode = "FIXED";        // width 은 layoutAlign STRETCH 로 결정
   txt.primaryAxisAlignItems = "MAX";          // justify-end
   txt.counterAxisAlignItems = "MIN";          // items-start
-  txt.itemSpacing = 2;
+  txt.itemSpacing = 0;                        // sub_text ↔ TEXT 사이 gap (lineHeight 로 자연 간격 확보)
   txt.layoutGrow = 1;                         // flex-1
   txt.layoutAlign = "STRETCH";                // w-full
 
