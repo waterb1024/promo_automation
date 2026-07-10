@@ -585,11 +585,11 @@ def templates_fetch():
 
 
 def _is_single_image_mode(req) -> bool:
-    """배너 또는 팝업이 1개뿐(랜딩 0, split 없음, 파일 1장)이면 zip 대신 이미지 직접 첨부."""
+    """배너·팝업·부가서비스가 통틀어 1개(랜딩 0, split 없음, 파일 1장)이면 zip 대신 이미지 직접 첨부."""
     counts = req.metadata.counts
     return (
         counts.landing == 0
-        and (counts.banner + counts.popup) == 1
+        and (counts.banner + counts.popup + counts.addon) == 1
         and len(req.files) == 1
         and not req.splits
     )
