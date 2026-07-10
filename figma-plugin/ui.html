@@ -1543,17 +1543,24 @@
   };
 
   // position 변경 시 UI 토글: 아이콘 position 은 프레임 export → 3D 변환만.
+  // 소통참여 하단(sotong-bottom) 은 이미지 생성 없이 텍스트만 적용.
   function _updateAddonUiByPosition() {
     if (!addonPositionSelect) return;
-    const isIcon = addonPositionSelect.value === "icon";
-    // "템플릿만 적용" 버튼 및 skip-preview 는 아이콘에선 무의미
+    const pos = addonPositionSelect.value;
+    const isIcon = pos === "icon";
+    const isTextOnly = pos === "sotong-bottom";
+    // "템플릿만 적용" 버튼 및 skip-preview 는 아이콘·텍스트만 위치에선 무의미
     const addonApplyOnly = document.getElementById("addon-apply");
     const addonSkipPrev  = document.getElementById("addon-skip-preview");
-    if (addonApplyOnly) addonApplyOnly.style.display = isIcon ? "none" : "";
+    if (addonApplyOnly) addonApplyOnly.style.display = (isIcon || isTextOnly) ? "none" : "";
     if (addonSkipPrev && addonSkipPrev.parentElement)
-      addonSkipPrev.parentElement.style.display = isIcon ? "none" : "";
+      addonSkipPrev.parentElement.style.display = (isIcon || isTextOnly) ? "none" : "";
     // 메인 버튼 라벨
-    if (addonApplyImageBtn) addonApplyImageBtn.textContent = isIcon ? "선택 프레임 3D 재변환" : "적용 + 이미지 생성";
+    if (addonApplyImageBtn) {
+      addonApplyImageBtn.textContent = isIcon
+        ? "선택 프레임 3D 재변환"
+        : (isTextOnly ? "기획 셀로 텍스트 적용" : "적용 + 이미지 생성");
+    }
   }
   if (addonPositionSelect) {
     addonPositionSelect.addEventListener("change", _updateAddonUiByPosition);
@@ -1587,6 +1594,26 @@
     const selName = (_selectionInfo && _selectionInfo.frames && _selectionInfo.frames[0])
       ? _selectionInfo.frames[0].name : "";
     const isExistingTemplate = existingRe && existingRe.test(selName);
+
+    // 소통참여 하단은 이미지 생성 없이 텍스트만 적용.
+    // - 기존 인스턴스 선택: 재적용할 이미지/텍스트 소스가 없으므로 no-op (경고만).
+    // - 기획 셀 선택: addon_from_spec 만 실행, _chainImageGenAfterApply 걸지 않음.
+    if (position === "sotong-bottom") {
+      if (isExistingTemplate) {
+        log("[부가서비스 소통참여 하단] 기존 인스턴스 (" + selName + ") — 이 위치는 텍스트 적용만 지원합니다. 기획 셀을 선택해주세요.", "warn");
+        return;
+      }
+      _imageGenPending = null;
+      _chainImageGenAfterApply = null;
+      setBusy(true);
+      _imgGenStart("addon");
+      _imgGenSetStage("기획 셀 → 새 템플릿 생성 중…", selName || "선택 프레임");
+      log("[부가서비스 소통참여 하단] 선택 프레임 = 기획 스펙 (" + (selName || "이름 없음") + ") → 새 템플릿 생성 + 텍스트 채움 (이미지 생성 skip)", "info");
+      parent.postMessage({
+        pluginMessage: { type: "addon_from_spec", position: position },
+      }, "*");
+      return;
+    }
 
     _imageGenPending = {
       kind: "addon",
@@ -1740,10 +1767,13 @@
     }
     const cur = b.items[b.idx];
     b.idx++;
-    const stagePrefix = b.textOnly ? "일괄(텍스트만) " : "일괄 ";
+    // 소통참여 하단은 배치 모드가 "전체" 여도 이미지 생성이 없는 위치이므로 강제 텍스트만.
+    const itemTextOnly = b.textOnly || cur.position === "sotong-bottom";
+    const stagePrefix = itemTextOnly ? "일괄(텍스트만) " : "일괄 ";
     _imgGenSetStage(stagePrefix + b.idx + "/" + b.items.length + " · " + cur.label, cur.name);
-    log("  [" + b.idx + "/" + b.items.length + "] " + cur.name + " → " + cur.label, "muted");
-    if (b.textOnly) {
+    log("  [" + b.idx + "/" + b.items.length + "] " + cur.name + " → " + cur.label +
+        (itemTextOnly && !b.textOnly ? " (텍스트만 — 이 위치는 이미지 생성 없음)" : ""), "muted");
+    if (itemTextOnly) {
       // 텍스트만 모드: 이미지 생성 체인을 걸지 않음 → addon_from_spec_done 에서
       // _chainImageGenAfterApply 가 null 이므로 곧바로 _runNextAddonBatchStep 로 이어짐.
       _imageGenPending = null;

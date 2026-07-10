@@ -1751,30 +1751,73 @@ async function buildAddonSupportBottom(opts) {
 }
 
 // 소통참여 하단 (480×348 → display 160×116)
+// Figma reference: 170:5191. 이미지 생성 없이 텍스트만 적용되는 위치.
+// 구조: outer(흰 bg + #eee stroke, VERTICAL auto-layout, padding 16, gap 8, justify-center)
+//   ├─ head (HORIZONTAL auto-layout, gap 4, items-center)
+//   │   ├─ img/20/service (20×20 pastel #ffcece placeholder — 사용자가 수동 교체)
+//   │   └─ svc_name (Pretendard Regular 13/18 #333)
+//   └─ txt (VERTICAL auto-layout, gap 2, layoutGrow 1, justify-end)
+//       ├─ sub_text (Pretendard Regular 16/22 #000)
+//       └─ TEXT     (Pretendard Bold    16/22 #000)
 async function buildAddonSotongBottom(opts) {
   opts = opts || {};
   const svc = opts.serviceName || "서비스명";
   const outer = _addonMkFrame(null, {
     name: "banner_소통참여_" + svc + "_bottom_480x348",
     width: 160, height: 116,
-    fills: _addonSolid("#f8faff"), cornerRadius: 8,
+    fills: _addonSolid("#ffffff"),
+    strokes: _addonSolid("#eeeeee"), strokeWeight: 1,
+    cornerRadius: 12, clipsContent: true,
   });
   figma.currentPage.appendChild(outer);
-  const head = _addonMkFrame(outer, { name: "head", x: 16, y: 16, width: 128, height: 20 });
-  _addonMkFrame(head, { name: "icon_20", x: 0, y: 0, width: 20, height: 20 });
+  outer.layoutMode = "VERTICAL";
+  outer.primaryAxisSizingMode = "FIXED";
+  outer.counterAxisSizingMode = "FIXED";
+  outer.primaryAxisAlignItems = "CENTER";     // justify-center
+  outer.counterAxisAlignItems = "MIN";        // items-start
+  outer.paddingTop = 16; outer.paddingBottom = 16;
+  outer.paddingLeft = 16; outer.paddingRight = 16;
+  outer.itemSpacing = 8;
+
+  // head: 아이콘 + 서비스명 (HUG both axes)
+  const head = _addonMkFrame(outer, { name: "head", fills: [] });
+  head.layoutMode = "HORIZONTAL";
+  head.primaryAxisSizingMode = "AUTO";
+  head.counterAxisSizingMode = "AUTO";
+  head.primaryAxisAlignItems = "MIN";
+  head.counterAxisAlignItems = "CENTER";
+  head.itemSpacing = 4;
+  _addonMkFrame(head, {
+    name: "img/20/service", width: 20, height: 20,
+    fills: _addonSolid("#ffcece"),
+  });
   await _addonMkText(head, {
-    name: "svc_name", x: 24, y: 1, width: 100, height: 18,
-    characters: svc, font: ADDON_FONT_SEMI, fontSize: 13, color: ADDON_DEFAULT_SUB_TEXT_HEX,
-    textAutoResize: "NONE",
+    name: "svc_name", characters: svc,
+    font: ADDON_FONT_REG, fontSize: 13, lineHeight: 18,
+    color: "#333333", textAutoResize: "WIDTH_AND_HEIGHT",
   });
-  const txt = _addonMkFrame(outer, { name: "txt", x: 16, y: 44, width: 128, height: 56 });
+
+  // txt: 남는 세로 공간 채우기 (layoutGrow 1) + counter FILL (w-full)
+  const txt = _addonMkFrame(outer, { name: "txt", fills: [] });
+  txt.layoutMode = "VERTICAL";
+  txt.primaryAxisSizingMode = "FIXED";        // height 은 layoutGrow 로 결정
+  txt.counterAxisSizingMode = "FIXED";        // width 은 layoutAlign STRETCH 로 결정
+  txt.primaryAxisAlignItems = "MAX";          // justify-end
+  txt.counterAxisAlignItems = "MIN";          // items-start
+  txt.itemSpacing = 2;
+  txt.layoutGrow = 1;                         // flex-1
+  txt.layoutAlign = "STRETCH";                // w-full
+
   await _addonMkText(txt, {
-    name: "TEXT", x: 0, y: 12, width: 128, height: 44,
-    characters: "", font: ADDON_FONT_BOLD, fontSize: 12, color: ADDON_DEFAULT_TEXT_HEX,
-    textAutoResize: "NONE",
+    name: "sub_text", characters: "저녁 찬거리 고민?",
+    font: ADDON_FONT_REG, fontSize: 16, lineHeight: 22,
+    color: "#000000", textAutoResize: "WIDTH_AND_HEIGHT",
   });
-  // 소통참여는 텍스트 위주지만 이미지 슬롯도 함께 두어 3D 아이콘/일러스트를 배치 가능
-  _addonMkFrame(outer, { name: "image", x: 100, y: 44, width: 48, height: 48 });
+  await _addonMkText(txt, {
+    name: "TEXT", characters: "시장에서 골라봐요",
+    font: ADDON_FONT_BOLD, fontSize: 16, lineHeight: 22,
+    color: "#000000", textAutoResize: "WIDTH_AND_HEIGHT",
+  });
   return outer;
 }
 
