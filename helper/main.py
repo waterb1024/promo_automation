@@ -34,7 +34,7 @@ from scripts.ppt_renderer import (
     pptx_extract_texts_grouped,
     PPTRenderError,
 )
-from scripts.revision import decide as decide_revision
+from scripts.revision import decide as decide_revision, RevisionDecision
 from scripts.zip_utils import write_utf8_zip
 
 
@@ -681,12 +681,29 @@ def package_and_upload(req: PackageAndUploadRequest):
     existing_attachments = [a.filename for a in issue.attachments]
 
     if single_image_mode:
-        # 배너/팝업 1장 → zip 없이 png/jpg 그대로 첨부
+        # 배너/팝업/부가서비스 1장 → zip 없이 png/jpg 그대로 첨부
         data, ext = _decode_single_image(req.files[0])
-        decision = decide_revision(
-            req.metadata.date, req.metadata.promotion, existing_attachments,
-            extension=ext,
+        # 부가서비스 프레임명(예: image_홈_..._top_1080x528_#fde8e9)은 위치·색상 등 컨텐츠
+        # 식별자가 들어있어 유지가 중요 → decide_revision 의 {date}_{promotion} 재명명 대신
+        # 원본 프레임 파일명 보존. 같은 이름 첨부가 이미 있으면 revision 으로 판정.
+        is_addon_only = (
+            req.metadata.counts.addon == 1
+            and req.metadata.counts.banner == 0
+            and req.metadata.counts.popup == 0
         )
+        if is_addon_only:
+            attach_filename = req.files[0].filename
+            is_rev = attach_filename in existing_attachments
+            decision = RevisionDecision(
+                zip_filename=attach_filename,
+                is_revision=is_rev,
+                revision_index=1 if is_rev else 0,
+            )
+        else:
+            decision = decide_revision(
+                req.metadata.date, req.metadata.promotion, existing_attachments,
+                extension=ext,
+            )
         attach_path = OUTPUT_DIR / decision.zip_filename
         attach_path.write_bytes(data)
         bytes_written = len(data)
