@@ -70,8 +70,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 COMMENT_TEMPLATES_PATH = Path(__file__).resolve().parent / "comment_templates.json"
 
 # 파일명 또는 "폴더/(폴더/)파일명" 2단계 까지 허용. 폴더명·파일명 모두 안전 문자만.
+# # 은 부가서비스 home-top 프레임명 끝의 _#RRGGBB 색상 접미사를 허용하기 위해 포함.
 SAFE_FILENAME_RE = re.compile(
-    r"^(?:[\w가-힣\-. ]+/){0,2}[\w가-힣\-. ]+\.(png|jpg|jpeg)$",
+    r"^(?:[\w가-힣\-.# ]+/){0,2}[\w가-힣\-.# ]+\.(png|jpg|jpeg)$",
     re.IGNORECASE,
 )
 
@@ -87,12 +88,19 @@ class Counts(BaseModel):
     banner: int = 0
     popup: int = 0
     landing: int = 0
+    addon: int = 0
 
 
 class Metadata(BaseModel):
     date: str = Field(..., description="MMDD")
     promotion: str
     counts: Counts
+    addon_positions: Optional[List[str]] = Field(
+        default=None,
+        description="부가서비스 프레임의 한글 위치 라벨 (예: '홈 상단', '생활편의 하단'). "
+                    "순서는 선택 순서와 동일. counts.addon 개수와 동일한 length. "
+                    "댓글 counts_text 를 위치별 breakdown 으로 렌더링할 때 사용.",
+    )
 
 
 class SplitSegment(BaseModel):
@@ -457,14 +465,18 @@ def _apply_splits(files: List[FileEntry], splits: Optional[List[SplitSpec]]) -> 
     return result
 
 
-def _format_counts(counts) -> str:
+def _format_counts(counts, addon_positions: Optional[List[str]] = None) -> str:
     """
     counts 객체를 자연어 문자열로 조합. 0개인 타입은 제외.
 
-    예) banner=1, popup=1, landing=1 → "배너1개, 팝업1개, 랜딩페이지1개"
-    예) banner=0, popup=2, landing=1 → "팝업2개, 랜딩페이지1개"
-    예) banner=2, popup=0, landing=0 → "배너2개"
-    예) 모두 0                       → "시안"
+    예) banner=1, popup=1, landing=1                → "배너1개, 팝업1개, 랜딩페이지1개"
+    예) banner=0, popup=2, landing=1                → "팝업2개, 랜딩페이지1개"
+    예) banner=2, popup=0, landing=0                → "배너2개"
+    예) addon=3 (위치 없음)                          → "부가서비스3개"
+    예) addon=1, positions=["홈 상단"]                → "홈 상단 배너1개"
+    예) addon=2, positions=["홈 상단", "홈 상단"]     → "홈 상단 배너2개"
+    예) addon=2, positions=["홈 상단", "생활편의 하단"] → "홈 상단 배너1개, 생활편의 하단 배너1개"
+    예) 모두 0                                       → "시안"
     """
     parts = []
     if counts.banner > 0:
@@ -473,6 +485,16 @@ def _format_counts(counts) -> str:
         parts.append(f"팝업{counts.popup}개")
     if counts.landing > 0:
         parts.append(f"랜딩페이지{counts.landing}개")
+    if counts.addon > 0:
+        if addon_positions:
+            # 위치별 breakdown — 첫 등장 순서 유지 + 위치별 카운트 집계
+            per_pos: Dict[str, int] = {}
+            for label in addon_positions:
+                per_pos[label] = per_pos.get(label, 0) + 1
+            for label, n in per_pos.items():
+                parts.append(f"{label} 배너{n}개")
+        else:
+            parts.append(f"부가서비스{counts.addon}개")
     return ", ".join(parts) if parts else "시안"
 
 
@@ -720,7 +742,7 @@ def package_and_upload(req: PackageAndUploadRequest):
     mention = (
         f"[~{issue.reporter_username}]" if issue.reporter_username else "@reporter"
     )
-    counts_text = _format_counts(req.metadata.counts)
+    counts_text = _format_counts(req.metadata.counts, req.metadata.addon_positions)
     comment = tpl.format(
         mention=mention,
         counts_text=counts_text,

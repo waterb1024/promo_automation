@@ -364,7 +364,7 @@ Plugin 상단 탭 → **[적용]** → sub-tab **[부가서비스]**.
 
 ### F. 시안 작업 + Way 업로드
 
-1. 시안 페이지로 이동 → 올릴 프레임들 선택 (배너 + 팝업 + 랜딩 등)
+1. 시안 페이지로 이동 → 올릴 프레임들 선택 (배너 + 팝업 + 랜딩 + 부가서비스 등)
 2. Plugin 의 이슈 키 확인
 3. **[선택 프레임 추출 → Way 업로드]** 클릭
 
@@ -374,6 +374,8 @@ Plugin 상단 탭 → **[적용]** → sub-tab **[부가서비스]**.
 - UTF-8 zip 패키징 (Mac/Win 한글 안 깨짐)
 - Way 이슈에 zip 첨부
 - 자동 댓글 등록 (reporter 멘션 + 개수 + 다운로드 링크)
+
+**부가서비스도 함께 업로드**: `image_홈_..._top_...`, `banner_benefits_..._bottom_...`, 홈 상단 legacy `home_img_..._#hex` 등 부가서비스 프레임도 같은 흐름으로 첨부됨. 부가서비스는 MMDD 가 프레임명에 없어 **오늘 MMDD + svc명** 으로 zip 파일명·댓글 metadata 를 합성. 댓글에는 **위치별 breakdown** 이 노출 (예: `홈 상단 배너1개, 생활편의 하단 배너2개`).
 
 처음엔 **[zip 만 만들기 (검수용)]** 로 zip 내용 확인 후 본 업로드 권장.
 
@@ -389,11 +391,15 @@ Plugin 상단 탭 → **[적용]** → sub-tab **[부가서비스]**.
 | 팝업 | `MMDD_popup_{프로모션명}_{w}x{h}` | `0518_popup_summersale_960x1140` |
 | 랜딩 | `MMDD_landing_{프로모션명}_{w}` | `0518_landing_summersale_1080` |
 | 소통참여 | `MMDD_image_소통참여_{주제}_top_984x552` | `0518_image_소통참여_카페에서_대화하는_두_사람_top_984x552` |
+| 부가서비스 | `{image\|banner}_{카테고리}_{svc}_{top\|middle\|bottom}_{w[xh]}[_#hex]` | `image_홈_카카오T택시_top_1080x528` · `banner_benefits_donate_bottom_984x264` |
+| 부가서비스 (홈 상단 legacy) | `home_img_{svc}[_#hex]` | `home_img_donate_#fde8e9` |
 
 - 날짜 **MMDD 4자리** (5월 18일 → `0518`)
 - 타입 **소문자** `banner` / `popup` / `landing`
 - 프로모션명 안에 밑줄 가능 (`summer_big_sale`)
 - 사이즈는 맨 뒤. 배너/팝업은 `WxH`, 랜딩은 width 만
+- **부가서비스**는 MMDD 프리픽스 없음. 업로드 시 오늘 MMDD + svc명 으로 zip/댓글 metadata 를 합성. 카테고리는 `홈` / `생활편의` / `benefits` / `소통참여`
+- **홈 상단만 legacy 네이밍(`home_img_...`)도 인식** — 사이즈 토큰 없이 short name, output 사이즈 1080×528 고정
 
 ---
 

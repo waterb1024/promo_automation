@@ -2,18 +2,116 @@
 // 선택 프레임 → PNG 추출 → UI 로 base64 전달 → UI 가 Helper 호출
 //
 // 프레임명 규칙 (모두 _ 로 구분):
-//   배너 : MMDD_banner_{promotion}_{w}x{h}
-//   팝업 : MMDD_popup_{promotion}_{w}x{h}
-//   랜딩 : MMDD_landing_{promotion}_{w}
+//   배너      : MMDD_banner_{promotion}_{w}x{h}
+//   팝업      : MMDD_popup_{promotion}_{w}x{h}
+//   랜딩      : MMDD_landing_{promotion}_{w}
+//   부가서비스: {image|banner}_{홈|생활편의|benefits|소통참여}_{svc}_{top|middle|bottom}_{w[xh]}[_#hex]
+//   홈상단 legacy: home_img_{svc}[_#hex]  ← 홈 상단만 특이 케이스로 short name 도 허용
 // 프로모션명에 _ 가 포함될 수 있어 "앞 2개(date,type) + 뒤 1개(size) 고정,
-// 가운데 모두 promotion" 으로 파싱.
+// 가운데 모두 promotion" 으로 파싱. 부가서비스는 date/promotion 이 없어
+// 오늘 MMDD + svc 를 합성 metadata 로 사용.
 
 figma.showUI(__html__, { width: 440, height: 800 });
 
-const TYPES = ["banner", "popup", "landing"];
+const TYPES = ["banner", "popup", "landing", "addon"];
+
+const ADDON_CATEGORY_TOKENS = { "홈": 1, "생활편의": 1, "benefits": 1, "소통참여": 1 };
+const ADDON_POSITION_TOKENS = { "top": 1, "middle": 1, "bottom": 1 };
+
+// 부가서비스 위치 → 댓글에 노출할 한글 라벨 (예: "홈 상단 배너1개")
+const ADDON_POSITION_LABELS = {
+  "홈/top": "홈 상단",
+  "홈/middle": "홈 중단",
+  "생활편의/top": "생활편의 상단",
+  "생활편의/bottom": "생활편의 하단",
+  "benefits/bottom": "지원금혜택 하단",
+  "소통참여/bottom": "소통참여 하단",
+};
+
+function _todayMMDD() {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1);
+  const dd = String(now.getDate());
+  return (mm.length < 2 ? "0" + mm : mm) + (dd.length < 2 ? "0" + dd : dd);
+}
+
+// 부가서비스 프레임명 파서. banner_/image_ 프리픽스 + 카테고리 + svc + 포지션 + 사이즈
+// (선택적 _#hex 색 접미사 지원, home-top 이 apply 시 추가함).
+function parseAddonName(parts) {
+  if (parts.length < 5) return null;
+  const prefix = parts[0];
+  if (prefix !== "image" && prefix !== "banner") return null;
+
+  const category = parts[1];
+  if (!ADDON_CATEGORY_TOKENS[category]) return null;
+
+  let end = parts.length - 1;
+  if (/^#[0-9a-fA-F]{6}$/.test(parts[end])) end--;
+  if (end < 3) return null;
+
+  const sizeToken = parts[end];
+  const position = parts[end - 1];
+  if (!ADDON_POSITION_TOKENS[position]) return null;
+
+  const svc = parts.slice(2, end - 1).join("_");
+  if (!svc) return null;
+
+  let intendedWidth = null;
+  let intendedHeight = null;
+  if (sizeToken.indexOf("x") !== -1) {
+    const wh = sizeToken.split("x");
+    if (wh.length !== 2) return null;
+    if (!/^\d+$/.test(wh[0]) || !/^\d+$/.test(wh[1])) return null;
+    intendedWidth = parseInt(wh[0], 10);
+    intendedHeight = parseInt(wh[1], 10);
+  } else {
+    if (!/^\d+$/.test(sizeToken)) return null;
+    intendedWidth = parseInt(sizeToken, 10);
+  }
+
+  return {
+    date: _todayMMDD(),
+    type: "addon",
+    promotion: svc,
+    intendedWidth, intendedHeight,
+    addonCategory: category,
+    addonPosition: position,
+  };
+}
+
+// 홈 상단 legacy 규칙: home_img_{svc}[_#hex]
+// 사이즈 토큰이 없으므로 표준 홈 상단 output 사이즈 1080×528 을 강제.
+function parseHomeTopLegacy(parts) {
+  if (parts.length < 3) return null;
+  if (parts[0] !== "home" || parts[1] !== "img") return null;
+
+  let end = parts.length - 1;
+  if (/^#[0-9a-fA-F]{6}$/.test(parts[end])) end--;
+  if (end < 2) return null;
+
+  const svc = parts.slice(2, end + 1).join("_");
+  if (!svc) return null;
+
+  return {
+    date: _todayMMDD(),
+    type: "addon",
+    promotion: svc,
+    intendedWidth: 1080,
+    intendedHeight: 528,
+    addonCategory: "홈",
+    addonPosition: "top",
+  };
+}
 
 function parseFrameName(name) {
   const parts = name.split("_");
+  if (parts.length < 3) return null;
+
+  // MMDD 로 시작하지 않으면 부가서비스 규칙 시도
+  if (!/^\d{4}$/.test(parts[0])) {
+    if (parts[0] === "home" && parts[1] === "img") return parseHomeTopLegacy(parts);
+    return parseAddonName(parts);
+  }
   if (parts.length < 4) return null;
 
   const date = parts[0];
@@ -21,7 +119,7 @@ function parseFrameName(name) {
   const sizeToken = parts[parts.length - 1];
   const promotion = parts.slice(2, -1).join("_");
 
-  if (!/^\d{4}$/.test(date)) return null;
+  if (type === "addon") return null;  // addon 은 MMDD_ 프리픽스 없음
   if (TYPES.indexOf(type) === -1) return null;
   if (!promotion) return null;
 
@@ -146,7 +244,8 @@ async function extractSelection(opts) {
   const files = [];
   const splits = [];   // PIL crop spec — 랜딩 자동 분할
   const warnings = [];
-  const counts = { banner: 0, popup: 0, landing: 0 };
+  const counts = { banner: 0, popup: 0, landing: 0, addon: 0 };
+  const addonPositions = [];  // ordered 한글 라벨 (예: "홈 상단", "생활편의 하단")
   let date = null;
   let promotion = null;
   const seenDates = {};
@@ -168,6 +267,10 @@ async function extractSelection(opts) {
     if (promotion === null) promotion = parsed.promotion;
 
     counts[parsed.type] += 1;
+    if (parsed.type === "addon") {
+      const key = parsed.addonCategory + "/" + parsed.addonPosition;
+      addonPositions.push(ADDON_POSITION_LABELS[key] || key);
+    }
     const scale = computeScale(parsed, frame);
 
     postProgress(
@@ -251,7 +354,10 @@ async function extractSelection(opts) {
     type: "extracted",
     files: files,
     splits: splits,                // 랜딩 자동 분할 spec (PIL crop)
-    metadata: { date: date, promotion: promotion, counts: counts },
+    metadata: {
+      date: date, promotion: promotion, counts: counts,
+      addon_positions: addonPositions,   // Helper 가 위치별 breakdown 렌더링
+    },
     warnings: warnings,
     mode: opts.mode || "zip",      // "upload" | "zip"
     jiraKey: opts.jiraKey || null  // upload 모드일 때만 사용
